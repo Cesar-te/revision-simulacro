@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ScoringService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -56,10 +57,10 @@ class StudentResult extends Model
     public function getSubjectScoresAttribute(): array
     {
         $scores = [];
-        /** @var \App\Services\ScoringService $scoringService */
-        $scoringService = app(\App\Services\ScoringService::class);
+        /** @var ScoringService $scoringService */
+        $scoringService = app(ScoringService::class);
 
-        foreach (\App\Services\ScoringService::SUBJECT_COLUMNS as $code => $info) {
+        foreach (ScoringService::SUBJECT_COLUMNS as $code => $info) {
             $scores[$code] = 0.0;
         }
 

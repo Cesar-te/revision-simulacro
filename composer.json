@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "cachimbos/revision-simulacro",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Sistema interno para importar, calificar y exportar resultados de simulacros UNPRG.",
+    "keywords": ["laravel", "simulacro", "unprg", "excel"],
     "license": "MIT",
     "require": {
         "php": "^8.3",

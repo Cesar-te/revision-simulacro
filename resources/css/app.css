@@ -1,9 +1,101 @@
 @import 'tailwindcss';
 
+@source '../views/**/*.blade.php';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+.glassmorphism {
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+    background: rgba(30, 41, 59, 0.58);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+.fa-solid {
+    display: inline-block;
+    min-width: 1em;
+    text-align: center;
+    font-style: normal;
+    line-height: 1;
+}
+
+.fa-solid::before {
+    content: "\2022";
+}
+
+.fa-arrow-left::before { content: "\2190"; }
+.fa-arrow-right::before { content: "\2192"; }
+.fa-arrows-rotate::before { content: "\21BB"; }
+.fa-bolt::before { content: "\26A1"; }
+.fa-book-open::before { content: "\25A3"; }
+.fa-calculator::before { content: "\2211"; }
+.fa-check::before,
+.fa-circle-check::before { content: "\2713"; }
+.fa-chevron-left::before { content: "\2039"; }
+.fa-chevron-right::before { content: "\203A"; }
+.fa-circle-exclamation::before { content: "!"; }
+.fa-circle-question::before { content: "?"; }
+.fa-cloud-arrow-up::before,
+.fa-upload::before,
+.fa-file-arrow-up::before { content: "\2191"; }
+.fa-compass-drafting::before { content: "\2316"; }
+.fa-file-circle-plus::before { content: "+"; }
+.fa-file-excel::before { content: "X"; }
+.fa-file-pdf::before { content: "P"; }
+.fa-folder-open::before { content: "\25A4"; }
+.fa-globe::before { content: "\25CB"; }
+.fa-graduation-cap::before { content: "\25C6"; }
+.fa-heart-pulse::before { content: "\2665"; }
+.fa-key::before { content: "\26BF"; }
+.fa-layer-group::before { content: "\25A6"; }
+.fa-list-check::before { content: "\2611"; }
+.fa-magnifying-glass::before { content: "\2315"; }
+.fa-microchip::before { content: "\25A3"; }
+.fa-minus::before { content: "\2212"; }
+.fa-plus::before { content: "+"; }
+.fa-spinner::before { content: "\25CC"; }
+.fa-trash-can::before { content: "\00D7"; }
+.fa-user-graduate::before,
+.fa-users::before { content: "\25C9"; }
+.fa-user-xmark::before { content: "\00D7"; }
+.fa-xmark::before { content: "\00D7"; }
+
+.fa-spin {
+    animation: fa-spin 1s linear infinite;
+}
+
+@keyframes fa-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }

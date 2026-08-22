@@ -4,20 +4,25 @@ namespace App\Http\Controllers;
 
 use App\Models\Career;
 use App\Models\Exam;
-use App\Models\ExamAnswerKey;
 use App\Models\StudentResult;
 use App\Services\ExcelExportService;
 use App\Services\ExcelImportService;
 use App\Services\PdfExportService;
 use App\Services\ScoringService;
 use Illuminate\Http\Request;
+use Throwable;
 
 class ExamController extends Controller
 {
     protected ExcelImportService $importService;
+
     protected ExcelExportService $exportService;
+
     protected PdfExportService $pdfService;
+
     protected ScoringService $scoringService;
+
+    private const EXCEL_FILE_RULE = 'nullable|file|mimes:xlsx,xls,csv|max:20480';
 
     public function __construct(
         ExcelImportService $importService,
@@ -52,9 +57,20 @@ class ExamController extends Controller
     {
         $request->validate([
             'title' => 'required|string|max:255',
+            'description' => 'nullable|string|max:2000',
             'incorrect_penalty' => 'nullable|numeric',
             'blank_score' => 'nullable|numeric',
             'total_questions' => 'nullable|integer|min:1|max:200',
+            'academic_group_keys' => 'nullable|in:A,BCD,EF,ALL',
+            'academic_group_responses' => 'nullable|in:A,BCD,EF',
+            'keys_file_a' => self::EXCEL_FILE_RULE,
+            'keys_file_bcd' => self::EXCEL_FILE_RULE,
+            'keys_file_ef' => self::EXCEL_FILE_RULE,
+            'keys_file' => self::EXCEL_FILE_RULE,
+            'responses_file_a' => self::EXCEL_FILE_RULE,
+            'responses_file_bcd' => self::EXCEL_FILE_RULE,
+            'responses_file_ef' => self::EXCEL_FILE_RULE,
+            'responses_file' => self::EXCEL_FILE_RULE,
         ]);
 
         $penalty = $request->input('incorrect_penalty', -1.1250);
@@ -70,34 +86,40 @@ class ExamController extends Controller
             'total_questions' => $request->input('total_questions', 100),
         ]);
 
+        $errors = [];
+
         // 1. Claves en lote (A, BCD, EF) o individuales
         if ($request->hasFile('keys_file_a')) {
-            $this->importService->importAnswerKeys($exam, $request->file('keys_file_a')->getRealPath(), 'A');
+            $this->runImport(fn () => $this->importService->importAnswerKeys($exam, $request->file('keys_file_a')->getRealPath(), 'A'), 'imported_keys', $errors);
         }
         if ($request->hasFile('keys_file_bcd')) {
-            $this->importService->importAnswerKeys($exam, $request->file('keys_file_bcd')->getRealPath(), 'BCD');
+            $this->runImport(fn () => $this->importService->importAnswerKeys($exam, $request->file('keys_file_bcd')->getRealPath(), 'BCD'), 'imported_keys', $errors);
         }
         if ($request->hasFile('keys_file_ef')) {
-            $this->importService->importAnswerKeys($exam, $request->file('keys_file_ef')->getRealPath(), 'EF');
+            $this->runImport(fn () => $this->importService->importAnswerKeys($exam, $request->file('keys_file_ef')->getRealPath(), 'EF'), 'imported_keys', $errors);
         }
         if ($request->hasFile('keys_file')) {
             $groupKeys = $request->input('academic_group_keys', 'ALL');
-            $this->importService->importAnswerKeys($exam, $request->file('keys_file')->getRealPath(), $groupKeys);
+            $this->runImport(fn () => $this->importService->importAnswerKeys($exam, $request->file('keys_file')->getRealPath(), $groupKeys), 'imported_keys', $errors);
         }
 
         // 2. Respuestas en lote (A, BCD, EF) o individuales
         if ($request->hasFile('responses_file_a')) {
-            $this->importService->importStudentResponses($exam, $request->file('responses_file_a')->getRealPath(), 'A');
+            $this->runImport(fn () => $this->importService->importStudentResponses($exam, $request->file('responses_file_a')->getRealPath(), 'A'), 'imported_students', $errors);
         }
         if ($request->hasFile('responses_file_bcd')) {
-            $this->importService->importStudentResponses($exam, $request->file('responses_file_bcd')->getRealPath(), 'BCD');
+            $this->runImport(fn () => $this->importService->importStudentResponses($exam, $request->file('responses_file_bcd')->getRealPath(), 'BCD'), 'imported_students', $errors);
         }
         if ($request->hasFile('responses_file_ef')) {
-            $this->importService->importStudentResponses($exam, $request->file('responses_file_ef')->getRealPath(), 'EF');
+            $this->runImport(fn () => $this->importService->importStudentResponses($exam, $request->file('responses_file_ef')->getRealPath(), 'EF'), 'imported_students', $errors);
         }
         if ($request->hasFile('responses_file')) {
             $groupResp = $request->input('academic_group_responses', null);
-            $this->importService->importStudentResponses($exam, $request->file('responses_file')->getRealPath(), $groupResp);
+            $this->runImport(fn () => $this->importService->importStudentResponses($exam, $request->file('responses_file')->getRealPath(), $groupResp), 'imported_students', $errors);
+        }
+
+        if (! empty($errors)) {
+            return redirect()->route('exams.show', $exam)->with('error', implode(' ', $errors));
         }
 
         return redirect()->route('exams.show', $exam)->with('success', 'Simulacro creado y procesado exitosamente.');
@@ -125,10 +147,10 @@ class ExamController extends Controller
 
         // Búsqueda por texto (nombre o DNI)
         if ($request->filled('search')) {
-            $search = '%' . $request->search . '%';
+            $search = '%'.$request->search.'%';
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', $search)
-                  ->orWhere('dni', 'like', $search);
+                    ->orWhere('dni', 'like', $search);
             });
         }
 
@@ -150,9 +172,9 @@ class ExamController extends Controller
         $minScore = $evalCount > 0 ? $statsGroup->min('total_score') : 0;
 
         $groupsCount = [
-            'A'   => $allResults->where('academic_group', 'A')->count(),
+            'A' => $allResults->where('academic_group', 'A')->count(),
             'BCD' => $allResults->where('academic_group', 'BCD')->count(),
-            'EF'  => $allResults->where('academic_group', 'EF')->count(),
+            'EF' => $allResults->where('academic_group', 'EF')->count(),
         ];
 
         $careersList = StudentResult::where('exam_id', $exam->id)
@@ -163,12 +185,12 @@ class ExamController extends Controller
 
         $answerKeys = $exam->answerKeys()->get();
         $keysByGroup = [
-            'A'   => $exam->answerKeys()->where('academic_group', 'A')->count(),
+            'A' => $exam->answerKeys()->where('academic_group', 'A')->count(),
             'BCD' => $exam->answerKeys()->where('academic_group', 'BCD')->count(),
-            'EF'  => $exam->answerKeys()->where('academic_group', 'EF')->count(),
+            'EF' => $exam->answerKeys()->where('academic_group', 'EF')->count(),
             'ALL' => $exam->answerKeys()->where('academic_group', 'ALL')->count(),
         ];
-        $subjectColumns = \App\Services\ScoringService::SUBJECT_COLUMNS;
+        $subjectColumns = ScoringService::SUBJECT_COLUMNS;
 
         return view('exams.show', compact(
             'exam',
@@ -190,27 +212,40 @@ class ExamController extends Controller
      */
     public function uploadKeys(Request $request, Exam $exam)
     {
+        $request->validate([
+            'academic_group' => 'nullable|in:A,BCD,EF,ALL',
+            'keys_file_a' => self::EXCEL_FILE_RULE,
+            'keys_file_bcd' => self::EXCEL_FILE_RULE,
+            'keys_file_ef' => self::EXCEL_FILE_RULE,
+            'keys_file' => self::EXCEL_FILE_RULE,
+        ]);
+
+        if (! $this->hasAnyFile($request, ['keys_file_a', 'keys_file_bcd', 'keys_file_ef', 'keys_file'])) {
+            return back()->with('error', 'Selecciona al menos un archivo de claves para procesar.');
+        }
+
         $importedCount = 0;
+        $errors = [];
 
         // Subida en lote de los 3 archivos de claves
         if ($request->hasFile('keys_file_a')) {
-            $resA = $this->importService->importAnswerKeys($exam, $request->file('keys_file_a')->getRealPath(), 'A');
-            $importedCount += $resA['imported_keys'];
+            $importedCount += $this->runImport(fn () => $this->importService->importAnswerKeys($exam, $request->file('keys_file_a')->getRealPath(), 'A'), 'imported_keys', $errors);
         }
         if ($request->hasFile('keys_file_bcd')) {
-            $resBCD = $this->importService->importAnswerKeys($exam, $request->file('keys_file_bcd')->getRealPath(), 'BCD');
-            $importedCount += $resBCD['imported_keys'];
+            $importedCount += $this->runImport(fn () => $this->importService->importAnswerKeys($exam, $request->file('keys_file_bcd')->getRealPath(), 'BCD'), 'imported_keys', $errors);
         }
         if ($request->hasFile('keys_file_ef')) {
-            $resEF = $this->importService->importAnswerKeys($exam, $request->file('keys_file_ef')->getRealPath(), 'EF');
-            $importedCount += $resEF['imported_keys'];
+            $importedCount += $this->runImport(fn () => $this->importService->importAnswerKeys($exam, $request->file('keys_file_ef')->getRealPath(), 'EF'), 'imported_keys', $errors);
         }
 
         // Subida de un solo archivo con selector de grupo
         if ($request->hasFile('keys_file')) {
             $group = $request->input('academic_group', 'ALL');
-            $res = $this->importService->importAnswerKeys($exam, $request->file('keys_file')->getRealPath(), $group);
-            $importedCount += $res['imported_keys'];
+            $importedCount += $this->runImport(fn () => $this->importService->importAnswerKeys($exam, $request->file('keys_file')->getRealPath(), $group), 'imported_keys', $errors);
+        }
+
+        if (! empty($errors)) {
+            return back()->with('error', implode(' ', $errors));
         }
 
         // Si ya hay estudiantes importados, recalcular puntajes automáticamente
@@ -226,27 +261,40 @@ class ExamController extends Controller
      */
     public function uploadResponses(Request $request, Exam $exam)
     {
+        $request->validate([
+            'academic_group' => 'nullable|in:A,BCD,EF',
+            'responses_file_a' => self::EXCEL_FILE_RULE,
+            'responses_file_bcd' => self::EXCEL_FILE_RULE,
+            'responses_file_ef' => self::EXCEL_FILE_RULE,
+            'responses_file' => self::EXCEL_FILE_RULE,
+        ]);
+
+        if (! $this->hasAnyFile($request, ['responses_file_a', 'responses_file_bcd', 'responses_file_ef', 'responses_file'])) {
+            return back()->with('error', 'Selecciona al menos un archivo de respuestas para procesar.');
+        }
+
         $importedCount = 0;
+        $errors = [];
 
         // Subida en lote de los 3 archivos de respuestas
         if ($request->hasFile('responses_file_a')) {
-            $resA = $this->importService->importStudentResponses($exam, $request->file('responses_file_a')->getRealPath(), 'A');
-            $importedCount += $resA['imported_students'];
+            $importedCount += $this->runImport(fn () => $this->importService->importStudentResponses($exam, $request->file('responses_file_a')->getRealPath(), 'A'), 'imported_students', $errors);
         }
         if ($request->hasFile('responses_file_bcd')) {
-            $resBCD = $this->importService->importStudentResponses($exam, $request->file('responses_file_bcd')->getRealPath(), 'BCD');
-            $importedCount += $resBCD['imported_students'];
+            $importedCount += $this->runImport(fn () => $this->importService->importStudentResponses($exam, $request->file('responses_file_bcd')->getRealPath(), 'BCD'), 'imported_students', $errors);
         }
         if ($request->hasFile('responses_file_ef')) {
-            $resEF = $this->importService->importStudentResponses($exam, $request->file('responses_file_ef')->getRealPath(), 'EF');
-            $importedCount += $resEF['imported_students'];
+            $importedCount += $this->runImport(fn () => $this->importService->importStudentResponses($exam, $request->file('responses_file_ef')->getRealPath(), 'EF'), 'imported_students', $errors);
         }
 
         // Subida de un solo archivo con selector de grupo
         if ($request->hasFile('responses_file')) {
             $group = $request->input('academic_group');
-            $res = $this->importService->importStudentResponses($exam, $request->file('responses_file')->getRealPath(), $group);
-            $importedCount += $res['imported_students'];
+            $importedCount += $this->runImport(fn () => $this->importService->importStudentResponses($exam, $request->file('responses_file')->getRealPath(), $group), 'imported_students', $errors);
+        }
+
+        if (! empty($errors)) {
+            return back()->with('error', implode(' ', $errors));
         }
 
         return redirect()->route('exams.show', $exam)->with('success', "Se procesaron {$importedCount} estudiantes y se calculó el orden de mérito consolidado.");
@@ -261,12 +309,12 @@ class ExamController extends Controller
         foreach ($results as $res) {
             $scoreData = $this->scoringService->scoreStudent($exam, $res->answers_json ?? [], $res->career, $res->academic_group);
             $res->update([
-                'academic_group'     => $scoreData['academic_group'],
-                'group_label'        => $scoreData['group_label'],
-                'correct_count'      => $scoreData['correct_count'],
-                'incorrect_count'    => $scoreData['incorrect_count'],
-                'blank_count'        => $scoreData['blank_count'],
-                'total_score'        => $scoreData['total_score'],
+                'academic_group' => $scoreData['academic_group'],
+                'group_label' => $scoreData['group_label'],
+                'correct_count' => $scoreData['correct_count'],
+                'incorrect_count' => $scoreData['incorrect_count'],
+                'blank_count' => $scoreData['blank_count'],
+                'total_score' => $scoreData['total_score'],
                 'scores_detail_json' => $scoreData['scores_detail_json'],
             ]);
         }
@@ -304,6 +352,8 @@ class ExamController extends Controller
      */
     public function studentDetail(Exam $exam, StudentResult $student)
     {
+        abort_unless($student->exam_id === $exam->id, 404);
+
         return response()->json([
             'student' => $student,
             'details' => $student->scores_detail_json,
@@ -316,6 +366,37 @@ class ExamController extends Controller
     public function destroy(Exam $exam)
     {
         $exam->delete();
+
         return redirect()->route('exams.index')->with('success', 'Simulacro eliminado.');
+    }
+
+    private function hasAnyFile(Request $request, array $fields): bool
+    {
+        foreach ($fields as $field) {
+            if ($request->hasFile($field)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function runImport(callable $callback, string $countKey, array &$errors): int
+    {
+        try {
+            $result = $callback();
+        } catch (Throwable $e) {
+            $errors[] = 'No se pudo procesar uno de los archivos. Revisa el formato e inténtalo nuevamente.';
+
+            return 0;
+        }
+
+        if (! ($result['success'] ?? false)) {
+            $errors[] = $result['message'] ?? 'No se pudo procesar uno de los archivos.';
+
+            return 0;
+        }
+
+        return (int) ($result[$countKey] ?? 0);
     }
 }

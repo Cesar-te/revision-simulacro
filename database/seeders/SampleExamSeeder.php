@@ -14,10 +14,10 @@ class SampleExamSeeder extends Seeder
      */
     public function run(): void
     {
-        $keysFile = base_path('Respuestas_Preguntas_UNPRG.xlsx');
-        $respFile = base_path('SIMULACRO 7°  (LETRAS) (respuestas).xlsx');
+        $keysFile = storage_path('app/samples/answer-keys.xlsx');
+        $respFile = storage_path('app/samples/student-responses.xlsx');
 
-        if (!file_exists($keysFile) || !file_exists($respFile)) {
+        if (! file_exists($keysFile) || ! file_exists($respFile)) {
             return;
         }
 
@@ -31,7 +31,7 @@ class SampleExamSeeder extends Seeder
             ]
         );
 
-        $scoring = new ScoringService();
+        $scoring = new ScoringService;
         $importer = new ExcelImportService($scoring);
 
         $importer->importAnswerKeys($exam, $keysFile);

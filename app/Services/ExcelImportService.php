@@ -7,7 +7,6 @@ use App\Models\ExamAnswerKey;
 use App\Models\StudentResult;
 use Carbon\Carbon;
 use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class ExcelImportService
 {
@@ -23,9 +22,20 @@ class ExcelImportService
      */
     public function importAnswerKeys(Exam $exam, string $filePath, string $academicGroup = 'ALL'): array
     {
-        $spreadsheet = IOFactory::load($filePath);
-        $sheet = $spreadsheet->getSheetByName('Respuestas') 
-            ?? $spreadsheet->getSheetByName('Clave rápida') 
+        try {
+            $spreadsheet = IOFactory::load($filePath);
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'No se pudo leer el archivo de claves. Verifica que sea un Excel válido (.xlsx, .xls o .csv).',
+                'imported_keys' => 0,
+                'max_question' => 0,
+                'academic_group' => strtoupper(trim($academicGroup ?: 'ALL')),
+            ];
+        }
+
+        $sheet = $spreadsheet->getSheetByName('Respuestas')
+            ?? $spreadsheet->getSheetByName('Clave rápida')
             ?? $spreadsheet->getActiveSheet();
 
         $rows = $sheet->toArray(null, true, true, true);
@@ -41,8 +51,10 @@ class ExcelImportService
 
         foreach ($rows as $rIdx => $row) {
             foreach ($row as $colLetter => $val) {
-                if (!$val) continue;
-                $v = mb_strtolower(trim((string)$val), 'UTF-8');
+                if (! $val) {
+                    continue;
+                }
+                $v = mb_strtolower(trim((string) $val), 'UTF-8');
                 if (in_array($v, ['n.º', 'n°', 'nº', 'número', 'numero', 'n.', 'item', 'pregunta', 'preg'])) {
                     $colMap['num'] = $colLetter;
                     $headerRowIndex = $rIdx;
@@ -63,26 +75,40 @@ class ExcelImportService
         }
 
         // Si no se encontró mapeo automático por cabecera, asumir columnas comunes (A=Num, B=Area, D=Clave)
-        if (!$colMap['num']) $colMap['num'] = 'A';
-        if (!$colMap['subject']) $colMap['subject'] = 'B';
-        if (!$colMap['key']) $colMap['key'] = 'D';
+        if (! $colMap['num']) {
+            $colMap['num'] = 'A';
+        }
+        if (! $colMap['subject']) {
+            $colMap['subject'] = 'B';
+        }
+        if (! $colMap['key']) {
+            $colMap['key'] = 'D';
+        }
 
         $importedCount = 0;
         $maxQuestionNum = 0;
         $cleanGroup = strtoupper(trim($academicGroup ?: 'ALL'));
 
         foreach ($rows as $rIdx => $row) {
-            if ($rIdx <= $headerRowIndex) continue;
+            if ($rIdx <= $headerRowIndex) {
+                continue;
+            }
 
             $qNumRaw = $row[$colMap['num']] ?? null;
-            if (!$qNumRaw || !is_numeric($qNumRaw)) continue;
+            if (! $qNumRaw || ! is_numeric($qNumRaw)) {
+                continue;
+            }
 
             $qNum = (int) $qNumRaw;
-            $subject = trim((string)($row[$colMap['subject']] ?? 'General'));
-            $key = strtoupper(trim((string)($row[$colMap['key']] ?? '')));
-            $explanation = trim((string)($row[$colMap['explanation'] ?? '']));
+            $subject = trim((string) ($row[$colMap['subject']] ?? 'General'));
+            $key = strtoupper(trim((string) ($row[$colMap['key']] ?? '')));
+            $explanation = $colMap['explanation']
+                ? trim((string) ($row[$colMap['explanation']] ?? ''))
+                : '';
 
-            if (empty($key)) continue;
+            if (empty($key)) {
+                continue;
+            }
 
             // Extraer solo la letra de clave si viene como "A) Opción" o similar
             if (strlen($key) > 1 && preg_match('/^[A-E]/', $key, $m)) {
@@ -91,12 +117,12 @@ class ExcelImportService
 
             ExamAnswerKey::updateOrCreate(
                 [
-                    'exam_id'         => $exam->id,
-                    'academic_group'  => $cleanGroup,
+                    'exam_id' => $exam->id,
+                    'academic_group' => $cleanGroup,
                     'question_number' => $qNum,
                 ],
                 [
-                    'subject'     => $subject ?: 'General',
+                    'subject' => $subject ?: 'General',
                     'correct_key' => substr($key, 0, 5),
                     'explanation' => $explanation ?: null,
                     'is_annulled' => ($key === '*'),
@@ -115,9 +141,9 @@ class ExcelImportService
         }
 
         return [
-            'success'        => true,
-            'imported_keys'  => $importedCount,
-            'max_question'   => $maxQuestionNum,
+            'success' => true,
+            'imported_keys' => $importedCount,
+            'max_question' => $maxQuestionNum,
             'academic_group' => $cleanGroup,
         ];
     }
@@ -127,7 +153,19 @@ class ExcelImportService
      */
     public function importStudentResponses(Exam $exam, string $filePath, ?string $academicGroup = null): array
     {
-        $spreadsheet = IOFactory::load($filePath);
+        $cleanGroup = $academicGroup ? $this->scoringService->normalizeGroup($academicGroup) : null;
+
+        try {
+            $spreadsheet = IOFactory::load($filePath);
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'No se pudo leer el archivo de respuestas. Verifica que sea un Excel válido (.xlsx, .xls o .csv).',
+                'imported_students' => 0,
+                'total_questions' => 0,
+            ];
+        }
+
         $sheet = $spreadsheet->getActiveSheet();
         $rows = $sheet->toArray(null, true, true, true);
 
@@ -145,27 +183,36 @@ class ExcelImportService
         $questionCols = []; // [q_num => ['col' => 'G', 'subject' => 'Habilidad Verbal']]
 
         foreach ($headerRow as $colLetter => $headerText) {
-            if (!$headerText) continue;
-            $h = mb_strtolower(trim((string)$headerText), 'UTF-8');
+            if (! $headerText) {
+                continue;
+            }
+            $h = mb_strtolower(trim((string) $headerText), 'UTF-8');
 
             if (str_contains($h, 'dni') || str_contains($h, 'documento') || str_contains($h, 'identidad')) {
                 $colDni = $colLetter;
+
                 continue;
             }
             if (str_contains($h, 'nombre') || str_contains($h, 'apellidos') || str_contains($h, 'postulante') || str_contains($h, 'alumno')) {
-                if (!$colName) $colName = $colLetter;
+                if (! $colName) {
+                    $colName = $colLetter;
+                }
+
                 continue;
             }
             if (str_contains($h, 'correo') || str_contains($h, 'email')) {
                 $colEmail = $colLetter;
+
                 continue;
             }
             if (str_contains($h, 'carrera') || str_contains($h, 'especialidad') || str_contains($h, 'opcion')) {
                 $colCareer = $colLetter;
+
                 continue;
             }
             if (str_contains($h, 'marca temporal') || str_contains($h, 'fecha') || str_contains($h, 'timestamp')) {
                 $colTimestamp = $colLetter;
+
                 continue;
             }
 
@@ -174,8 +221,8 @@ class ExcelImportService
                 preg_match('/PREGUNTA\s*(\d+)/i', $headerText, $matches) ||
                 preg_match('/^P\s*(\d+)$/i', $headerText, $matches) ||
                 preg_match('/^(\d+)$/i', $headerText, $matches)) {
-                
-                $qNum = (int)$matches[1];
+
+                $qNum = (int) $matches[1];
                 $subject = 'General';
                 // Extraer el nombre de la asignatura antes del corchete
                 if (preg_match('/^(.*?)\s*\[/i', $headerText, $subMatch)) {
@@ -189,11 +236,21 @@ class ExcelImportService
         }
 
         // Si no se detectaron columnas por nombre, buscar por posición clásica
-        if (!$colName) $colName = 'D';
-        if (!$colDni) $colDni = 'E';
-        if (!$colCareer) $colCareer = 'F';
-        if (!$colEmail) $colEmail = 'B';
-        if (!$colTimestamp) $colTimestamp = 'A';
+        if (! $colName) {
+            $colName = 'D';
+        }
+        if (! $colDni) {
+            $colDni = 'E';
+        }
+        if (! $colCareer) {
+            $colCareer = 'F';
+        }
+        if (! $colEmail) {
+            $colEmail = 'B';
+        }
+        if (! $colTimestamp) {
+            $colTimestamp = 'A';
+        }
 
         // Si no se detectaron preguntas con corchetes, asumir columnas consecutivas a partir de la columna 7 (G)
         if (empty($questionCols)) {
@@ -223,18 +280,20 @@ class ExcelImportService
         $totalRows = count($rows);
 
         // Limpiar solo los resultados del grupo específico si se indicó, para no borrar a los otros grupos
-        if ($academicGroup) {
-            StudentResult::where('exam_id', $exam->id)->where('academic_group', $academicGroup)->delete();
+        if ($cleanGroup) {
+            StudentResult::where('exam_id', $exam->id)->where('academic_group', $cleanGroup)->delete();
         }
 
         for ($rIdx = 2; $rIdx <= $totalRows; $rIdx++) {
             $row = $rows[$rIdx] ?? null;
-            if (!$row) continue;
+            if (! $row) {
+                continue;
+            }
 
-            $fullName = trim((string)($row[$colName] ?? ''));
-            $dni = trim((string)($row[$colDni] ?? ''));
-            $career = trim((string)($row[$colCareer] ?? ''));
-            $email = trim((string)($row[$colEmail] ?? ''));
+            $fullName = trim((string) ($row[$colName] ?? ''));
+            $dni = trim((string) ($row[$colDni] ?? ''));
+            $career = trim((string) ($row[$colCareer] ?? ''));
+            $email = trim((string) ($row[$colEmail] ?? ''));
             $timestampRaw = $row[$colTimestamp] ?? null;
 
             // Si la fila no tiene nombre ni DNI, se salta
@@ -246,7 +305,7 @@ class ExcelImportService
             $studentAnswers = [];
             foreach ($questionCols as $qNum => $qData) {
                 $rawAns = $row[$qData['col']] ?? '';
-                $cleanAns = strtoupper(trim((string)$rawAns));
+                $cleanAns = strtoupper(trim((string) $rawAns));
                 // Extraer solo la primera letra si viene "A) Respuesta..."
                 if (strlen($cleanAns) > 1 && preg_match('/^[A-E]/', $cleanAns, $m)) {
                     $cleanAns = $m[0];
@@ -255,7 +314,7 @@ class ExcelImportService
             }
 
             // Calificar al estudiante usando ScoringService con el grupo respectivo si se especificó
-            $scoreData = $this->scoringService->scoreStudent($exam, $studentAnswers, $career ?: 'Sin Carrera', $academicGroup);
+            $scoreData = $this->scoringService->scoreStudent($exam, $studentAnswers, $career ?: 'Sin Carrera', $cleanGroup);
 
             $submittedAt = null;
             if ($timestampRaw) {
@@ -268,22 +327,23 @@ class ExcelImportService
 
             StudentResult::updateOrCreate(
                 [
-                    'exam_id'   => $exam->id,
+                    'exam_id' => $exam->id,
+                    'academic_group' => $scoreData['academic_group'],
+                    'dni' => $dni ?: null,
                     'full_name' => $fullName ?: 'Estudiante sin nombre',
                 ],
                 [
-                    'dni'                => $dni ?: null,
-                    'email'              => $email ?: null,
-                    'career'             => $career ?: 'Sin Carrera',
-                    'academic_group'     => $scoreData['academic_group'],
-                    'group_label'        => $scoreData['group_label'],
-                    'correct_count'      => $scoreData['correct_count'],
-                    'incorrect_count'    => $scoreData['incorrect_count'],
-                    'blank_count'        => $scoreData['blank_count'],
-                    'total_score'        => $scoreData['total_score'],
-                    'answers_json'       => $studentAnswers,
+                    'email' => $email ?: null,
+                    'career' => $career ?: 'Sin Carrera',
+                    'academic_group' => $scoreData['academic_group'],
+                    'group_label' => $scoreData['group_label'],
+                    'correct_count' => $scoreData['correct_count'],
+                    'incorrect_count' => $scoreData['incorrect_count'],
+                    'blank_count' => $scoreData['blank_count'],
+                    'total_score' => $scoreData['total_score'],
+                    'answers_json' => $studentAnswers,
                     'scores_detail_json' => $scoreData['scores_detail_json'],
-                    'submitted_at'       => $submittedAt,
+                    'submitted_at' => $submittedAt,
                 ]
             );
 
@@ -294,9 +354,9 @@ class ExcelImportService
         $this->scoringService->recalculateRanks($exam);
 
         return [
-            'success'           => true,
+            'success' => true,
             'imported_students' => $importedStudents,
-            'total_questions'   => count($questionCols),
+            'total_questions' => count($questionCols),
         ];
     }
 }

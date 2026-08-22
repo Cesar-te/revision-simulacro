@@ -16,24 +16,24 @@ class ScoringService
     public const WEIGHT_CONFIG = [
         'A' => [ // Biomédicas
             'VERBAL_MATE' => 20.0000,
-            'MATE_BASIC'  => 14.3014,
-            'LETRAS'      => 14.2770,
+            'MATE_BASIC' => 14.3014,
+            'LETRAS' => 14.2770,
             'FISICA_QUIM' => 25.0000,
-            'BIOLOGIA'    => 25.0000,
+            'BIOLOGIA' => 25.0000,
         ],
         'BCD' => [ // Letras / Humanidades / Económicas / Sociales
             'VERBAL_MATE' => 20.0000,
-            'MATE_BASIC'  => 16.0012,
-            'LETRAS'      => 23.5290,
+            'MATE_BASIC' => 16.0012,
+            'LETRAS' => 23.5290,
             'FISICA_QUIM' => 14.5450,
-            'BIOLOGIA'    => 14.5450,
+            'BIOLOGIA' => 14.5450,
         ],
         'EF' => [ // Ingenierías / Agropecuarias
             'VERBAL_MATE' => 20.0000,
-            'MATE_BASIC'  => 22.2220,
-            'LETRAS'      => 17.6310,
+            'MATE_BASIC' => 22.2220,
+            'LETRAS' => 17.6310,
             'FISICA_QUIM' => 22.2220,
-            'BIOLOGIA'    => 13.0038,
+            'BIOLOGIA' => 13.0038,
         ],
     ];
 
@@ -41,23 +41,23 @@ class ScoringService
      * Lista y mapeo de columnas de asignaturas UNPRG
      */
     public const SUBJECT_COLUMNS = [
-        'HV'   => ['name' => 'Habilidad Verbal', 'short' => 'HV'],
-        'HM'   => ['name' => 'Habilidad Matemática', 'short' => 'HM'],
+        'HV' => ['name' => 'Habilidad Verbal', 'short' => 'HV'],
+        'HM' => ['name' => 'Habilidad Matemática', 'short' => 'HM'],
         'ARIT' => ['name' => 'Aritmética', 'short' => 'ARIT'],
         'GEOM' => ['name' => 'Geometría', 'short' => 'GEOM'],
-        'ALG'  => ['name' => 'Álgebra', 'short' => 'ALG'],
+        'ALG' => ['name' => 'Álgebra', 'short' => 'ALG'],
         'TRIG' => ['name' => 'Trigonometría', 'short' => 'TRIG'],
         'LENG' => ['name' => 'Lenguaje', 'short' => 'LENG'],
-        'LIT'  => ['name' => 'Literatura', 'short' => 'LIT'],
+        'LIT' => ['name' => 'Literatura', 'short' => 'LIT'],
         'PSIC' => ['name' => 'Psicología', 'short' => 'PSIC'],
-        'CIV'  => ['name' => 'Educación Cívica', 'short' => 'CIV'],
+        'CIV' => ['name' => 'Educación Cívica', 'short' => 'CIV'],
         'HIST' => ['name' => 'Historia', 'short' => 'HIST'],
         'GEOG' => ['name' => 'Geografía', 'short' => 'GEOG'],
         'ECON' => ['name' => 'Economía', 'short' => 'ECON'],
         'FILO' => ['name' => 'Filosofía', 'short' => 'FILO'],
-        'FIS'  => ['name' => 'Física', 'short' => 'FIS'],
-        'QUI'  => ['name' => 'Química', 'short' => 'QUI'],
-        'BIO'  => ['name' => 'Biología', 'short' => 'BIO'],
+        'FIS' => ['name' => 'Física', 'short' => 'FIS'],
+        'QUI' => ['name' => 'Química', 'short' => 'QUI'],
+        'BIO' => ['name' => 'Biología', 'short' => 'BIO'],
     ];
 
     /**
@@ -182,6 +182,7 @@ class ScoringService
         if (in_array($g, ['E', 'F', 'EF', 'INGENIERIA', 'INGENIERIAS'])) {
             return 'EF';
         }
+
         return 'A'; // Default Biomédicas
     }
 
@@ -196,7 +197,7 @@ class ScoringService
         if ($career) {
             return [
                 'academic_group' => $career->academic_group,
-                'group_label'    => $career->group_label,
+                'group_label' => $career->group_label,
             ];
         }
 
@@ -204,7 +205,7 @@ class ScoringService
         $upper = mb_strtoupper($cleanName, 'UTF-8');
         $clean = strtr($upper, ['Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U']);
 
-        if (str_contains($clean, 'MEDICINA') || str_contains($clean, 'ENFERMERIA') || (str_contains($clean, 'BIOLOGIA') && !str_contains($clean, 'EDUCACION')) || str_contains($clean, 'VETERINARIA')) {
+        if (str_contains($clean, 'MEDICINA') || str_contains($clean, 'ENFERMERIA') || (str_contains($clean, 'BIOLOGIA') && ! str_contains($clean, 'EDUCACION')) || str_contains($clean, 'VETERINARIA')) {
             return ['academic_group' => 'A', 'group_label' => 'Ciencias Médicas (Biomédicas)'];
         }
 
@@ -228,6 +229,7 @@ class ScoringService
         if ($keys->isEmpty()) {
             $keys = $exam->answerKeys()->get();
         }
+
         return $keys->keyBy('question_number');
     }
 
@@ -239,10 +241,10 @@ class ScoringService
         $groupInfo = $this->getGroupForCareer($careerName);
         $groupCode = $forcedGroup ? $this->normalizeGroup($forcedGroup) : $this->normalizeGroup($groupInfo['academic_group']);
 
-        $groupLabel = match($groupCode) {
-            'A'     => 'Ciencias Médicas (Biomédicas)',
-            'BCD'   => 'Letras / Sociales y Económicas',
-            'EF'    => 'Ciencias e Ingenierías',
+        $groupLabel = match ($groupCode) {
+            'A' => 'Ciencias Médicas (Biomédicas)',
+            'BCD' => 'Letras / Sociales y Económicas',
+            'EF' => 'Ciencias e Ingenierías',
             default => $groupInfo['group_label'] ?? 'General',
         };
 
@@ -261,7 +263,7 @@ class ScoringService
         $totalQuestions = $exam->total_questions > 0 ? $exam->total_questions : count($answerKeys);
 
         for ($i = 1; $i <= $totalQuestions; $i++) {
-            $givenAnswer = isset($studentAnswers[$i]) ? strtoupper(trim((string)$studentAnswers[$i])) : '';
+            $givenAnswer = isset($studentAnswers[$i]) ? strtoupper(trim((string) $studentAnswers[$i])) : '';
             /** @var ExamAnswerKey|null $keyObj */
             $keyObj = $answerKeys->get($i);
 
@@ -297,22 +299,22 @@ class ScoringService
 
             $scoresDetail[$i] = [
                 'question_number' => $i,
-                'subject'         => $subject,
-                'given_answer'    => $givenAnswer,
-                'correct_key'     => $correctKey,
-                'status'          => $status,
-                'points'          => round($questionScore, 4),
+                'subject' => $subject,
+                'given_answer' => $givenAnswer,
+                'correct_key' => $correctKey,
+                'status' => $status,
+                'points' => round($questionScore, 4),
             ];
         }
 
         return [
-            'academic_group'     => $groupInfo['academic_group'],
-            'group_label'        => $groupInfo['group_label'],
-            'correct_count'      => $correctCount,
-            'incorrect_count'    => $incorrectCount,
-            'blank_count'        => $blankCount,
-            'total_score'        => round($totalScore, 4), // Permite puntajes negativos
-            'raw_total_score'    => round($totalScore, 4),
+            'academic_group' => $groupCode,
+            'group_label' => $groupLabel,
+            'correct_count' => $correctCount,
+            'incorrect_count' => $incorrectCount,
+            'blank_count' => $blankCount,
+            'total_score' => round($totalScore, 4), // Permite puntajes negativos
+            'raw_total_score' => round($totalScore, 4),
             'scores_detail_json' => $scoresDetail,
         ];
     }

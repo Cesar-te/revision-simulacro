@@ -2,56 +2,66 @@
 
 namespace Tests\Feature;
 
-use App\Models\Career;
 use App\Models\Exam;
+use App\Models\ExamAnswerKey;
 use App\Models\StudentResult;
+use App\Models\User;
 use App\Services\ExcelImportService;
 use App\Services\ScoringService;
 use Database\Seeders\CareerSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 class SimulacroImportTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** @var array<int, string> */
+    private array $tempFiles = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->seed(CareerSeeder::class);
+        $this->actingAs(User::factory()->create());
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->tempFiles as $file) {
+            if (is_file($file)) {
+                unlink($file);
+            }
+        }
+
+        parent::tearDown();
     }
 
     public function test_can_create_exam_import_keys_and_responses(): void
     {
-        $scoring = new ScoringService();
+        $scoring = new ScoringService;
         $importer = new ExcelImportService($scoring);
 
         $exam = Exam::create([
-            'title' => 'SIMULACRO 7° - LETRAS (UNPRG)',
-            'description' => 'Test de integración con archivos reales',
+            'title' => 'SIMULACRO 7 - LETRAS (UNPRG)',
+            'description' => 'Test de integracion con archivos generados',
             'incorrect_penalty' => -1.1250,
             'blank_score' => 0.0,
             'total_questions' => 100,
         ]);
 
-        $keysFile = base_path('Respuestas_Preguntas_UNPRG.xlsx');
-        $respFile = base_path('SIMULACRO 7°  (LETRAS) (respuestas).xlsx');
-
-        $this->assertFileExists($keysFile);
-        $this->assertFileExists($respFile);
-
-        $resKeys = $importer->importAnswerKeys($exam, $keysFile);
+        $resKeys = $importer->importAnswerKeys($exam, $this->makeAnswerKeysFile(), 'ALL');
         $this->assertTrue($resKeys['success']);
-        $this->assertGreaterThan(0, $resKeys['imported_keys']);
+        $this->assertEquals(100, $resKeys['imported_keys']);
 
-        $resStudents = $importer->importStudentResponses($exam, $respFile);
+        $resStudents = $importer->importStudentResponses($exam, $this->makeResponsesFile(), 'BCD');
         $this->assertTrue($resStudents['success']);
-        $this->assertGreaterThan(0, $resStudents['imported_students']);
+        $this->assertEquals(2, $resStudents['imported_students']);
 
-        $totalResults = StudentResult::where('exam_id', $exam->id)->count();
-        $this->assertEquals($resStudents['imported_students'], $totalResults);
-
-        // Validar que el primer puesto tenga ranking 1 y puntaje superior a 0
         $topStudent = StudentResult::where('exam_id', $exam->id)->where('general_rank', 1)->first();
         $this->assertNotNull($topStudent);
         $this->assertGreaterThan(0, $topStudent->total_score);
@@ -60,7 +70,6 @@ class SimulacroImportTest extends TestCase
         $this->assertArrayHasKey('HM', $topStudent->subject_scores);
         $this->assertArrayHasKey('BIO', $topStudent->subject_scores);
 
-        // Probar ruta HTTP index y show
         $response = $this->get(route('exams.show', $exam));
         $response->assertStatus(200);
         $response->assertSee($topStudent->full_name);
@@ -71,7 +80,7 @@ class SimulacroImportTest extends TestCase
 
     public function test_allows_negative_total_scores(): void
     {
-        $scoring = new ScoringService();
+        $scoring = new ScoringService;
         $exam = Exam::create([
             'title' => 'TEST EXAMEN',
             'incorrect_penalty' => -1.1250,
@@ -79,7 +88,6 @@ class SimulacroImportTest extends TestCase
             'total_questions' => 10,
         ]);
 
-        // Simular todas respuestas incorrectas (10 malas * -1.125 = -11.25)
         $studentAnswers = array_fill(1, 10, 'Z');
         $result = $scoring->scoreStudent($exam, $studentAnswers, 'DERECHO');
 
@@ -91,8 +99,7 @@ class SimulacroImportTest extends TestCase
 
     public function test_multi_group_answer_keys_and_responses(): void
     {
-        $scoring = new ScoringService();
-        $importer = new ExcelImportService($scoring);
+        $scoring = new ScoringService;
 
         $exam = Exam::create([
             'title' => 'SIMULACRO MULTI-GRUPO UNPRG',
@@ -101,35 +108,32 @@ class SimulacroImportTest extends TestCase
             'total_questions' => 20,
         ]);
 
-        // 1. Claves para grupo A (Biomédicas)
-        \App\Models\ExamAnswerKey::create([
+        ExamAnswerKey::create([
             'exam_id' => $exam->id,
             'academic_group' => 'A',
             'question_number' => 1,
-            'subject' => 'Biología',
+            'subject' => 'Biologia',
             'correct_key' => 'A',
         ]);
 
-        // 2. Claves para grupo EF (Ingenierías)
-        \App\Models\ExamAnswerKey::create([
+        ExamAnswerKey::create([
             'exam_id' => $exam->id,
             'academic_group' => 'EF',
             'question_number' => 1,
-            'subject' => 'Física',
+            'subject' => 'Fisica',
             'correct_key' => 'B',
         ]);
 
-        // Estudiante A responde 'A' a la preg 1 -> Correcta con ponderación de Biomédicas (25 pts)
         $scoreA = $scoring->scoreStudent($exam, [1 => 'A'], 'MEDICINA HUMANA', 'A');
         $this->assertEquals(1, $scoreA['correct_count']);
         $this->assertEquals(25.0, $scoreA['total_score']);
+        $this->assertEquals('A', $scoreA['academic_group']);
 
-        // Estudiante EF responde 'B' a la preg 1 -> Correcta con ponderación de Ingenierías (22.222 pts)
-        $scoreEF = $scoring->scoreStudent($exam, [1 => 'B'], 'INGENIERIA CIVIL', 'EF');
+        $scoreEF = $scoring->scoreStudent($exam, [1 => 'B'], 'DERECHO', 'EF');
         $this->assertEquals(1, $scoreEF['correct_count']);
         $this->assertEquals(22.222, $scoreEF['total_score']);
+        $this->assertEquals('EF', $scoreEF['academic_group']);
 
-        // Crear StudentResults
         $stA = StudentResult::create([
             'exam_id' => $exam->id,
             'full_name' => 'Alumno Biomedicas',
@@ -150,22 +154,15 @@ class SimulacroImportTest extends TestCase
 
         $scoring->recalculateRanks($exam);
 
-        $stA->refresh();
-        $stEF->refresh();
-
-        // En la tabla general: Alumno Biomedicas es 1°, Alumno Ingenieria es 2°
-        $this->assertEquals(1, $stA->general_rank);
-        $this->assertEquals(2, $stEF->general_rank);
-
-        // En sus grupos respectivos: ambos son 1° de su grupo
-        $this->assertEquals(1, $stA->group_rank);
-        $this->assertEquals(1, $stEF->group_rank);
+        $this->assertEquals(1, $stA->fresh()->general_rank);
+        $this->assertEquals(2, $stEF->fresh()->general_rank);
+        $this->assertEquals(1, $stA->fresh()->group_rank);
+        $this->assertEquals(1, $stEF->fresh()->group_rank);
     }
 
     public function test_importing_different_groups_does_not_delete_other_groups(): void
     {
-        $scoring = new ScoringService();
-        $importer = new ExcelImportService($scoring);
+        $importer = new ExcelImportService(new ScoringService);
 
         $exam = Exam::create([
             'title' => 'SIMULACRO TEST MULTI GRUPOS',
@@ -174,12 +171,8 @@ class SimulacroImportTest extends TestCase
             'total_questions' => 100,
         ]);
 
-        $keysFile = base_path('Respuestas_Preguntas_UNPRG.xlsx');
-        $respFile = base_path('SIMULACRO 7°  (LETRAS) (respuestas).xlsx');
+        $importer->importAnswerKeys($exam, $this->makeAnswerKeysFile(), 'ALL');
 
-        $importer->importAnswerKeys($exam, $keysFile, 'ALL');
-
-        // 1. Simular alumno existente de Biomédicas (A)
         StudentResult::create([
             'exam_id' => $exam->id,
             'full_name' => 'Postulante Biomedicas Previsto',
@@ -189,21 +182,84 @@ class SimulacroImportTest extends TestCase
             'total_score' => 1000.0,
         ]);
 
-        $this->assertEquals(1, StudentResult::where('exam_id', $exam->id)->where('academic_group', 'A')->count());
+        $res = $importer->importStudentResponses($exam, $this->makeResponsesFile(), 'BCD');
 
-        // 2. Importar respuestas del Grupo BCD (Letras)
-        $res = $importer->importStudentResponses($exam, $respFile, 'BCD');
         $this->assertTrue($res['success']);
-
-        // 3. El alumno del Grupo A debe SEGUIR existiendo en la base de datos
         $this->assertEquals(1, StudentResult::where('exam_id', $exam->id)->where('academic_group', 'A')->count());
         $this->assertGreaterThan(0, StudentResult::where('exam_id', $exam->id)->where('academic_group', 'BCD')->count());
-
-        // Total debe ser 1 (de A) + N (de BCD)
         $this->assertEquals(1 + $res['imported_students'], StudentResult::where('exam_id', $exam->id)->count());
     }
 
+    public function test_same_dni_with_different_names_is_imported_as_separate_rows(): void
+    {
+        $importer = new ExcelImportService(new ScoringService);
+
+        $exam = Exam::create([
+            'title' => 'SIMULACRO DUPLICADOS',
+            'incorrect_penalty' => -1.1250,
+            'blank_score' => 0.0,
+            'total_questions' => 3,
+        ]);
+
+        $importer->importAnswerKeys($exam, $this->makeAnswerKeysFile(3), 'BCD');
+        $res = $importer->importStudentResponses($exam, $this->makeResponsesFile(3, [
+            ['Uno Test', '70000000', 'Derecho', ['A', 'A', 'A']],
+            ['Otro Test', '70000000', 'Derecho', ['A', 'B', 'A']],
+        ]), 'BCD');
+
+        $this->assertTrue($res['success']);
+        $this->assertEquals(2, StudentResult::where('exam_id', $exam->id)->where('dni', '70000000')->count());
+    }
+
+    public function test_student_detail_cannot_cross_exam_boundaries(): void
+    {
+        $exam = Exam::create(['title' => 'Exam A']);
+        $otherExam = Exam::create(['title' => 'Exam B']);
+        $student = StudentResult::create([
+            'exam_id' => $otherExam->id,
+            'full_name' => 'Alumno Externo',
+            'career' => 'Derecho',
+            'academic_group' => 'BCD',
+        ]);
+
+        $this->get(route('exams.student-detail', [$exam, $student]))->assertNotFound();
+    }
+
     public function test_export_excel_for_each_group_and_general(): void
+    {
+        $exam = $this->makeExamWithResults();
+
+        $this->get(route('exams.export', ['exam' => $exam, 'group' => 'all']))
+            ->assertStatus(200)
+            ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $this->get(route('exams.export', ['exam' => $exam, 'group' => 'A']))
+            ->assertStatus(200)
+            ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $this->get(route('exams.export', ['exam' => $exam, 'group' => 'BCD']))
+            ->assertStatus(200)
+            ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $this->get(route('exams.export', ['exam' => $exam, 'group' => 'EF']))
+            ->assertStatus(200)
+            ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+
+    public function test_export_pdf_generates_landscape_pdf(): void
+    {
+        $exam = $this->makeExamWithResults();
+
+        $this->get(route('exams.export-pdf', ['exam' => $exam]))
+            ->assertStatus(200)
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->get(route('exams.export-pdf', ['exam' => $exam, 'group' => 'A']))
+            ->assertStatus(200)
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    private function makeExamWithResults(): Exam
     {
         $exam = Exam::create([
             'title' => 'SIMULACRO EXPORT TEST',
@@ -245,53 +301,96 @@ class SimulacroImportTest extends TestCase
             'group_rank' => 1,
         ]);
 
-        // 1. Export General
-        $resGen = $this->get(route('exams.export', ['exam' => $exam, 'group' => 'all']));
-        $resGen->assertStatus(200);
-        $resGen->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-
-        // 2. Export Biomédicas (A)
-        $resA = $this->get(route('exams.export', ['exam' => $exam, 'group' => 'A']));
-        $resA->assertStatus(200);
-        $resA->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-
-        // 3. Export Letras (BCD)
-        $resBCD = $this->get(route('exams.export', ['exam' => $exam, 'group' => 'BCD']));
-        $resBCD->assertStatus(200);
-        $resBCD->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-
-        // 4. Export Ingenierías (EF)
-        $resEF = $this->get(route('exams.export', ['exam' => $exam, 'group' => 'EF']));
-        $resEF->assertStatus(200);
-        $resEF->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        return $exam;
     }
 
-    public function test_export_pdf_generates_landscape_pdf()
+    private function makeAnswerKeysFile(int $questions = 100): string
     {
-        $exam = Exam::create([
-            'title' => 'Simulacro PDF Test',
-            'incorrect_penalty' => -1.1250,
-            'blank_score' => 0.0,
-            'total_questions' => 100,
-        ]);
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Respuestas');
+        $sheet->fromArray(['N.', 'Area', 'Tema', 'Clave'], null, 'A1');
 
-        StudentResult::create([
-            'exam_id' => $exam->id,
-            'full_name' => 'Estudiante Uno',
-            'career' => 'Medicina Humana',
-            'academic_group' => 'A',
-            'correct_count' => 80,
-            'total_score' => 1600.0,
-            'general_rank' => 1,
-            'group_rank' => 1,
-        ]);
+        $subjects = [
+            'Habilidad Verbal',
+            'Habilidad Matematica',
+            'Aritmetica',
+            'Geometria',
+            'Algebra',
+            'Trigonometria',
+            'Lenguaje',
+            'Literatura',
+            'Psicologia',
+            'Educacion Civica',
+            'Historia',
+            'Geografia',
+            'Economia',
+            'Filosofia',
+            'Fisica',
+            'Quimica',
+            'Biologia',
+        ];
 
-        $res = $this->get(route('exams.export-pdf', ['exam' => $exam]));
-        $res->assertStatus(200);
-        $res->assertHeader('content-type', 'application/pdf');
+        for ($i = 1; $i <= $questions; $i++) {
+            $sheet->setCellValue('A'.($i + 1), $i);
+            $sheet->setCellValue('B'.($i + 1), $subjects[($i - 1) % count($subjects)]);
+            $sheet->setCellValue('D'.($i + 1), 'A');
+        }
 
-        $resGroup = $this->get(route('exams.export-pdf', ['exam' => $exam, 'group' => 'A']));
-        $resGroup->assertStatus(200);
-        $resGroup->assertHeader('content-type', 'application/pdf');
+        return $this->writeSpreadsheet($spreadsheet, 'keys');
+    }
+
+    /**
+     * @param  array<int, array{0: string, 1: string, 2: string, 3: array<int, string>}>|null  $students
+     */
+    private function makeResponsesFile(int $questions = 100, ?array $students = null): string
+    {
+        $students ??= [
+            ['Alumno Correcto', '70000001', 'Derecho', array_fill(0, $questions, 'A')],
+            ['Alumno Regular', '70000002', 'Derecho', array_fill(0, $questions, 'B')],
+        ];
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setCellValue('A1', 'Marca temporal');
+        $sheet->setCellValue('B1', 'Correo');
+        $sheet->setCellValue('D1', 'Nombre y apellidos');
+        $sheet->setCellValue('E1', 'DNI');
+        $sheet->setCellValue('F1', 'Carrera');
+
+        for ($i = 1; $i <= $questions; $i++) {
+            $column = Coordinate::stringFromColumnIndex(6 + $i);
+            $sheet->setCellValue("{$column}1", "Habilidad Verbal [PREGUNTA {$i}]");
+        }
+
+        foreach ($students as $index => [$name, $dni, $career, $answers]) {
+            $row = $index + 2;
+            $sheet->setCellValue("A{$row}", now()->toDateTimeString());
+            $sheet->setCellValue("B{$row}", strtolower(str_replace(' ', '.', $name)).'@example.test');
+            $sheet->setCellValue("D{$row}", $name);
+            $sheet->setCellValue("E{$row}", $dni);
+            $sheet->setCellValue("F{$row}", $career);
+
+            for ($i = 1; $i <= $questions; $i++) {
+                $column = Coordinate::stringFromColumnIndex(6 + $i);
+                $sheet->setCellValue("{$column}{$row}", $answers[$i - 1] ?? '');
+            }
+        }
+
+        return $this->writeSpreadsheet($spreadsheet, 'responses');
+    }
+
+    private function writeSpreadsheet(Spreadsheet $spreadsheet, string $prefix): string
+    {
+        $dir = storage_path('framework/testing/excel');
+        if (! is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+
+        $path = $dir.'/'.uniqid($prefix.'_', true).'.xlsx';
+        (new Xlsx($spreadsheet))->save($path);
+        $this->tempFiles[] = $path;
+
+        return $path;
     }
 }

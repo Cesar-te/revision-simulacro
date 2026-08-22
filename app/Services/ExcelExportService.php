@@ -4,9 +4,12 @@ namespace App\Services;
 
 use App\Models\Exam;
 use App\Models\StudentResult;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -23,7 +26,7 @@ class ExcelExportService
      */
     public function exportExamResults(Exam $exam, ?string $groupFilter = null, ?string $careerFilter = null): StreamedResponse
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
 
         // 1. Hoja General
         $sheetGeneral = $spreadsheet->getActiveSheet();
@@ -56,7 +59,7 @@ class ExcelExportService
             $spreadsheet->setActiveSheetIndex(0);
         }
 
-        $fileName = 'Resultados_' . preg_replace('/[^A-Za-z0-9_\-]/', '_', $exam->title) . '.xlsx';
+        $fileName = 'Resultados_'.preg_replace('/[^A-Za-z0-9_\-]/', '_', $exam->title).'.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet) {
             $writer = new Xlsx($spreadsheet);
@@ -88,15 +91,15 @@ class ExcelExportService
 
         // Título del reporte
         $sheet->mergeCells('A1:Y1');
-        $sheet->setCellValue('A1', 'CACHIMBOS UNPRG - ' . $groupTitle);
-        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('000000'));
+        $sheet->setCellValue('A1', 'CACHIMBOS UNPRG - '.$groupTitle);
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14)->setColor(new Color('000000'));
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getRowDimension(1)->setRowHeight(32);
 
         // Subtítulo
         $sheet->mergeCells('A2:Y2');
-        $sheet->setCellValue('A2', mb_strtoupper($exam->title, 'UTF-8') . ' | Evaluados: ' . $results->count() . ' alumnos | Penalidad: ' . $exam->incorrect_penalty . ' pts | Blanco: ' . $exam->blank_score . ' pts');
-        $sheet->getStyle('A2')->getFont()->setSize(10)->setItalic(true)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('475569'));
+        $sheet->setCellValue('A2', mb_strtoupper($exam->title, 'UTF-8').' | Evaluados: '.$results->count().' alumnos | Penalidad: '.$exam->incorrect_penalty.' pts | Blanco: '.$exam->blank_score.' pts');
+        $sheet->getStyle('A2')->getFont()->setSize(10)->setItalic(true)->setColor(new Color('475569'));
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         // Definir columnas base y de asignaturas
@@ -118,16 +121,16 @@ class ExcelExportService
         $headerTitles[] = 'BLANCO';
         $headerTitles[] = 'PUNTS';
 
-        if (!$group) {
+        if (! $group) {
             $headerTitles[] = 'GRUPO';
         }
 
-        $lastColLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headerTitles));
+        $lastColLetter = Coordinate::stringFromColumnIndex(count($headerTitles));
 
         // Escribir encabezados en fila 4
         $colIdx = 1;
         foreach ($headerTitles as $title) {
-            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx);
+            $colLetter = Coordinate::stringFromColumnIndex($colIdx);
             $sheet->setCellValue("{$colLetter}4", $title);
             $colIdx++;
         }
@@ -141,7 +144,7 @@ class ExcelExportService
         ]);
 
         // Columna Carrera en azul pastel suave
-        $sheet->getStyle("D4")->applyFromArray([
+        $sheet->getStyle('D4')->applyFromArray([
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFCFE2FF']],
         ]);
 
@@ -162,24 +165,24 @@ class ExcelExportService
             $sheet->setCellValue([$colIdx++, $rowNum], $r->full_name);
 
             // C: DNI
-            $sheet->setCellValueExplicit([$colIdx++, $rowNum], $r->dni ?: '-', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit([$colIdx++, $rowNum], $r->dni ?: '-', DataType::TYPE_STRING);
 
             // D: Carrera
             $sheet->setCellValue([$colIdx++, $rowNum], $r->career);
 
             // E a U: Asignaturas (17 materias)
             foreach (array_keys($subjectCols) as $code) {
-                $val = (float)($subScores[$code] ?? 0.0);
+                $val = (float) ($subScores[$code] ?? 0.0);
                 $sheet->setCellValue([$colIdx++, $rowNum], round($val, 4));
             }
 
             // Buenas, Malas, Blanco (enteros), PUNTS (float)
-            $sheet->setCellValue([$colIdx++, $rowNum], (int)$r->correct_count);
-            $sheet->setCellValue([$colIdx++, $rowNum], (int)$r->incorrect_count);
-            $sheet->setCellValue([$colIdx++, $rowNum], (int)$r->blank_count);
-            $sheet->setCellValue([$colIdx++, $rowNum], round((float)$r->total_score, 4));
+            $sheet->setCellValue([$colIdx++, $rowNum], (int) $r->correct_count);
+            $sheet->setCellValue([$colIdx++, $rowNum], (int) $r->incorrect_count);
+            $sheet->setCellValue([$colIdx++, $rowNum], (int) $r->blank_count);
+            $sheet->setCellValue([$colIdx++, $rowNum], round((float) $r->total_score, 4));
 
-            if (!$group) {
+            if (! $group) {
                 $sheet->setCellValue([$colIdx++, $rowNum], $r->academic_group);
             }
 
@@ -210,12 +213,12 @@ class ExcelExportService
         $sheet->getStyle("Y5:Y{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $sheet->getStyle("Y5:Y{$lastRow}")->getFont()->setBold(true);
 
-        if (!$group) {
+        if (! $group) {
             $sheet->getStyle("Z5:Z{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
 
         // Bordes de la tabla de datos
-        $sheet->getStyle("A4:{$lastColLetter}{$lastRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FF94A3B8'));
+        $sheet->getStyle("A4:{$lastColLetter}{$lastRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new Color('FF94A3B8'));
 
         // Anchos de columna uniformes y proporcionales
         $sheet->getColumnDimension('A')->setWidth(7);   // N°
@@ -225,7 +228,7 @@ class ExcelExportService
 
         // Las 17 columnas de asignaturas (E a U) tienen exactamente el MISMO tamaño uniforme
         for ($i = 5; $i <= 21; $i++) {
-            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i);
+            $colLetter = Coordinate::stringFromColumnIndex($i);
             $sheet->getColumnDimension($colLetter)->setWidth(11.5);
         }
 
@@ -235,7 +238,7 @@ class ExcelExportService
         $sheet->getColumnDimension('X')->setWidth(9);   // BLANCO
         $sheet->getColumnDimension('Y')->setWidth(14);  // PUNTS
 
-        if (!$group) {
+        if (! $group) {
             $sheet->getColumnDimension('Z')->setWidth(10); // GRUPO
         }
     }

@@ -1,58 +1,102 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Revision de Simulacros UNPRG
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistema interno para administradores que importa claves y respuestas desde Excel, calcula puntajes ponderados por grupo academico y exporta resultados en Excel/PDF.
 
-## About Laravel
+## Funciones principales
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Login administrativo sin registro publico.
+- Importacion de claves por grupo: `A`, `BCD`, `EF` o general `ALL`.
+- Importacion de respuestas por grupo sin borrar resultados de otros grupos.
+- Calculo de puntaje con penalidad por incorrecta, blancos y preguntas anuladas.
+- Ranking general, por grupo academico y por carrera.
+- Filtros por grupo, carrera, nombre y DNI.
+- Exportacion Excel con hojas General, Biomedicas, Letras e Ingenierias.
+- Exportacion PDF horizontal para publicacion o impresion.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requisitos
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.3+
+- Composer
+- Node.js y npm
+- SQLite para desarrollo local, o la base configurada en `.env`
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Instalacion local
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+npm run build
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+En PowerShell, si `npm run build` esta bloqueado por la politica de ejecucion, usa:
 
-## Contributing
+```bash
+npm.cmd run build
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Acceso inicial
 
-## Code of Conduct
+El seeder crea un administrador con estos valores por defecto:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- Correo: `admin@example.com`
+- Contrasena: `password`
 
-## Security Vulnerabilities
+Puedes cambiarlos antes de ejecutar `php artisan migrate --seed` usando:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```dotenv
+ADMIN_NAME="Administrador"
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=password
+```
 
-## License
+## Formato de archivos Excel
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Claves
+
+El importador detecta columnas por encabezados. Los nombres recomendados son:
+
+- `N.`, `Numero`, `Pregunta` o similar para el numero de pregunta.
+- `Area`, `Asignatura`, `Materia` o `Curso` para la materia.
+- `Clave`, `Respuesta` o `Resp` para la alternativa correcta.
+- `Justificacion` o `Explicacion` opcional.
+
+Si no encuentra encabezados, asume:
+
+- Columna `A`: numero de pregunta.
+- Columna `B`: area/asignatura.
+- Columna `D`: clave.
+
+### Respuestas
+
+El importador busca:
+
+- `DNI` o documento.
+- `Nombre`, `Apellidos`, `Postulante` o `Alumno`.
+- `Correo` o `Email`.
+- `Carrera`, `Especialidad` u `Opcion`.
+- Preguntas como `[PREGUNTA 1]`, `PREGUNTA 1`, `P1` o `1`.
+
+Si no detecta columnas de preguntas, asume que empiezan desde la columna `G`.
+
+## Reglas de datos
+
+- Si se importa un grupo especifico, solo se reemplazan resultados de ese grupo.
+- Si el mismo DNI aparece con nombres distintos, se conserva como filas separadas.
+- Si coinciden examen, grupo, DNI y nombre, se actualiza la fila existente.
+- Si se fuerza un grupo al importar, ese grupo manda sobre la carrera detectada.
+
+## Comandos utiles
+
+```bash
+php artisan test
+.\vendor\bin\phpunit --do-not-cache-result
+npm.cmd run build
+```
+
+## Archivos fuera del repo
+
+Los Excel (`*.xls`, `*.xlsx`) estan ignorados por Git. Si necesitas probar con archivos reales, dejalos localmente o en una carpeta privada, pero no los versionees.
