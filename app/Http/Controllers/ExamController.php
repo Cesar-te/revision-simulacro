@@ -367,6 +367,44 @@ class ExamController extends Controller
     }
 
     /**
+     * Corrige una clave oficial puntual y recalcula resultados.
+     */
+    public function updateAnswerKey(Request $request, Exam $exam, ExamAnswerKey $answerKey)
+    {
+        abort_unless($answerKey->exam_id === $exam->id, 404);
+
+        $validated = $request->validate([
+            'subject' => ['required', 'string', 'max:120'],
+            'correct_key' => ['required', 'string', 'max:5'],
+            'explanation' => ['nullable', 'string', 'max:2000'],
+            'is_annulled' => ['nullable', 'boolean'],
+        ]);
+
+        $correctKey = strtoupper(trim($validated['correct_key']));
+        if (strlen($correctKey) > 1 && preg_match('/^[A-E]/', $correctKey, $matches)) {
+            $correctKey = $matches[0];
+        }
+
+        $isAnnulled = $request->boolean('is_annulled') || $correctKey === '*';
+        if (! $isAnnulled && ! in_array($correctKey, ['A', 'B', 'C', 'D', 'E'], true)) {
+            return back()->withErrors([
+                'correct_key' => 'La clave debe ser A, B, C, D, E o * para anular.',
+            ]);
+        }
+
+        $answerKey->update([
+            'subject' => trim($validated['subject']),
+            'correct_key' => $isAnnulled ? '*' : $correctKey,
+            'explanation' => filled($validated['explanation'] ?? null) ? trim($validated['explanation']) : null,
+            'is_annulled' => $isAnnulled,
+        ]);
+
+        $this->recalculateExamResults($exam);
+
+        return redirect()->route('exams.show', $exam)->with('success', "Clave {$answerKey->academic_group} #{$answerKey->question_number} actualizada y resultados recalculados.");
+    }
+
+    /**
      * Exportar resultados en Excel
      */
     public function export(Request $request, Exam $exam)

@@ -621,12 +621,14 @@
                             <th class="py-2.5 px-3 text-center w-24">Grupo</th>
                             <th class="py-2.5 px-3">Asignatura / Área</th>
                             <th class="py-2.5 px-3 text-center w-20">Clave</th>
+                            <th class="py-2.5 px-3 text-center w-24">Anulada</th>
                             <th class="py-2.5 px-3">Justificación / Detalle</th>
+                            <th class="py-2.5 px-3 text-center w-24">Guardar</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60 bg-slate-900/50">
                         @foreach($answerKeys as $key)
-                            <tr class="hover:bg-slate-800/40 key-row" data-group="{{ $key->academic_group }}">
+                            <tr class="hover:bg-slate-800/40 key-row" data-group="{{ $key->academic_group }}" data-key-id="{{ $key->id }}">
                                 <td class="py-2 px-3 text-center font-bold text-slate-300">{{ $key->question_number }}</td>
                                 <td class="py-2 px-3 text-center whitespace-nowrap">
                                     @if($key->academic_group === 'A')
@@ -639,13 +641,29 @@
                                         <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">Gen</span>
                                     @endif
                                 </td>
-                                <td class="py-2 px-3 text-slate-300">{{ $key->subject ?: 'General' }}</td>
-                                <td class="py-2 px-3 text-center">
-                                    <span class="inline-block w-6 h-6 leading-6 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold">
-                                        {{ $key->correct_key }}
-                                    </span>
+                                <td class="py-2 px-3 text-slate-300">
+                                    <input form="answer-key-form-{{ $key->id }}" type="text" name="subject" value="{{ $key->subject ?: 'General' }}" class="w-full min-w-40 px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-[11px] text-slate-200 focus:outline-none focus:border-amber-500">
                                 </td>
-                                <td class="py-2 px-3 text-slate-400 text-[11px]">{{ $key->explanation ?: '-' }}</td>
+                                <td class="py-2 px-3 text-center">
+                                    <input form="answer-key-form-{{ $key->id }}" type="text" name="correct_key" value="{{ $key->correct_key }}" maxlength="5" class="w-16 px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-amber-300 text-center font-bold uppercase focus:outline-none focus:border-amber-500">
+                                </td>
+                                <td class="py-2 px-3 text-center">
+                                    <label class="inline-flex items-center justify-center">
+                                        <input form="answer-key-form-{{ $key->id }}" type="checkbox" name="is_annulled" value="1" {{ $key->is_annulled ? 'checked' : '' }} class="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500">
+                                    </label>
+                                </td>
+                                <td class="py-2 px-3 text-slate-400 text-[11px]">
+                                    <input form="answer-key-form-{{ $key->id }}" type="text" name="explanation" value="{{ $key->explanation }}" placeholder="Opcional" class="w-full min-w-56 px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-[11px] text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500">
+                                </td>
+                                <td class="py-2 px-3 text-center">
+                                    <form id="answer-key-form-{{ $key->id }}" action="{{ route('exams.answer-keys.update', ['exam' => $exam, 'answerKey' => $key]) }}" method="POST">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="px-2.5 py-1.5 text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors">
+                                            Guardar
+                                        </button>
+                                    </form>
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

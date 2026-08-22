@@ -293,6 +293,70 @@ class SimulacroImportTest extends TestCase
         $this->assertEquals(1, $student->general_rank);
     }
 
+    public function test_admin_can_correct_answer_key_and_recalculate_results(): void
+    {
+        $exam = Exam::create([
+            'title' => 'SIMULACRO CLAVE EDITABLE',
+            'incorrect_penalty' => -1.1250,
+            'blank_score' => 0,
+            'total_questions' => 1,
+        ]);
+
+        $answerKey = ExamAnswerKey::create([
+            'exam_id' => $exam->id,
+            'academic_group' => 'BCD',
+            'question_number' => 1,
+            'subject' => 'Habilidad Verbal',
+            'correct_key' => 'A',
+        ]);
+
+        StudentResult::create([
+            'exam_id' => $exam->id,
+            'full_name' => 'Alumno Correccion',
+            'career' => 'Derecho',
+            'academic_group' => 'BCD',
+            'answers_json' => [1 => 'B'],
+        ]);
+
+        $this->post(route('exams.recalculate', $exam));
+        $this->assertEquals(-1.125, StudentResult::where('exam_id', $exam->id)->firstOrFail()->total_score);
+
+        $this->patch(route('exams.answer-keys.update', [$exam, $answerKey]), [
+            'subject' => 'Habilidad Verbal',
+            'correct_key' => 'B',
+            'explanation' => 'Correccion manual',
+        ])->assertRedirect(route('exams.show', $exam));
+
+        $this->assertDatabaseHas('exam_answer_keys', [
+            'id' => $answerKey->id,
+            'correct_key' => 'B',
+            'is_annulled' => false,
+            'explanation' => 'Correccion manual',
+        ]);
+
+        $student = StudentResult::where('exam_id', $exam->id)->firstOrFail();
+        $this->assertEquals(20.0, $student->total_score);
+        $this->assertEquals('correct', $student->scores_detail_json[1]['status']);
+    }
+
+    public function test_answer_key_edit_cannot_cross_exam_boundaries(): void
+    {
+        $exam = Exam::create(['title' => 'Exam A']);
+        $otherExam = Exam::create(['title' => 'Exam B']);
+        $answerKey = ExamAnswerKey::create([
+            'exam_id' => $otherExam->id,
+            'academic_group' => 'A',
+            'question_number' => 1,
+            'subject' => 'Biologia',
+            'correct_key' => 'A',
+        ]);
+
+        $this->patch(route('exams.answer-keys.update', [$exam, $answerKey]), [
+            'subject' => 'Biologia',
+            'correct_key' => 'B',
+        ])->assertNotFound();
+    }
+
     public function test_export_excel_for_each_group_and_general(): void
     {
         $exam = $this->makeExamWithResults();

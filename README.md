@@ -10,6 +10,7 @@ Sistema interno para administradores que importa claves y respuestas desde Excel
 - Calculo de puntaje con penalidad por incorrecta, blancos y preguntas anuladas.
 - Ranking general, por grupo academico y por carrera.
 - Puntajes por pregunta editables por simulacro, grupo y bloque.
+- Correccion manual de claves oficiales sin volver a importar Excel.
 - Filtros por grupo, carrera, nombre y DNI.
 - Exportacion Excel con hojas General, Biomedicas, Letras e Ingenierias.
 - Exportacion PDF horizontal para publicacion o impresion.
@@ -102,6 +103,15 @@ Los bloques configurables son:
 - Letras y humanidades.
 - Fisica y quimica.
 - Biologia.
+
+## Corregir una clave oficial
+
+Dentro de un simulacro abre `Claves Oficiales`. Cada pregunta registrada se puede editar desde la tabla:
+
+- Cambia la asignatura/area si estaba mal.
+- Cambia la clave a `A`, `B`, `C`, `D` o `E`.
+- Usa `*` o marca `Anulada` para otorgar el puntaje completo de esa pregunta.
+- Guarda la fila para recalcular automaticamente los resultados.
 
 ## Comandos utiles
 
