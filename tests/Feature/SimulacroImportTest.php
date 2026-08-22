@@ -193,6 +193,34 @@ class SimulacroImportTest extends TestCase
         $this->assertEquals('MATE_BASIC', $score['scores_detail_json'][41]['score_category']);
     }
 
+    public function test_letters_uses_its_group_distribution(): void
+    {
+        $scoring = new ScoringService;
+        $exam = Exam::create([
+            'title' => 'SIMULACRO DISTRIBUCION BCD',
+            'incorrect_penalty' => -1.1250,
+            'blank_score' => 0.0,
+            'total_questions' => 100,
+        ]);
+
+        foreach ([41, 56, 90, 96] as $question) {
+            ExamAnswerKey::create([
+                'exam_id' => $exam->id,
+                'academic_group' => 'BCD',
+                'question_number' => $question,
+                'subject' => 'Biologia',
+                'correct_key' => 'A',
+            ]);
+        }
+
+        $score = $scoring->scoreStudent($exam, [41 => 'A', 56 => 'A', 90 => 'A', 96 => 'A'], 'Derecho', 'BCD');
+
+        $this->assertEquals('MATE_BASIC', $score['scores_detail_json'][41]['score_category']);
+        $this->assertEquals('LETRAS', $score['scores_detail_json'][56]['score_category']);
+        $this->assertEquals('FISICA_QUIM', $score['scores_detail_json'][90]['score_category']);
+        $this->assertEquals('BIOLOGIA', $score['scores_detail_json'][96]['score_category']);
+    }
+
     public function test_all_correct_scores_reach_2000_with_group_distributions(): void
     {
         $scoring = new ScoringService;

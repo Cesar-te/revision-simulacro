@@ -53,9 +53,10 @@
             <p class="text-xs text-slate-400 mt-1">Derecho, Economía, Educación, Artes, etc.</p>
             <div class="mt-4 pt-3 border-t border-slate-800/80 space-y-1.5 text-xs text-slate-300">
                 <div class="flex justify-between"><span class="text-slate-400">Verbal y Mate (40 preg):</span> <span class="font-semibold text-white">20.00 pts c/u</span></div>
-                <div class="flex justify-between"><span class="text-slate-400">Humanidades / Letras (34 preg):</span> <span class="font-semibold text-amber-300">23.5290 pts c/u</span></div>
                 <div class="flex justify-between"><span class="text-slate-400">Ciencias Básicas (15 preg):</span> <span class="font-semibold text-white">16.0012 pts</span></div>
-                <div class="flex justify-between"><span class="text-slate-400">Ciencias Naturales (11 preg):</span> <span class="font-semibold text-white">14.5450 pts</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Humanidades / Letras (34 preg):</span> <span class="font-semibold text-amber-300">23.5290 pts c/u</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Física y Química (6 preg):</span> <span class="font-semibold text-white">14.5450 pts</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Biología (5 preg):</span> <span class="font-semibold text-white">14.5450 pts</span></div>
             </div>
         </div>
 
