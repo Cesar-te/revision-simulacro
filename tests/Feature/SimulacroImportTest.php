@@ -225,6 +225,31 @@ class SimulacroImportTest extends TestCase
         $this->get(route('exams.student-detail', [$exam, $student]))->assertNotFound();
     }
 
+    public function test_index_counts_answer_keys_against_loaded_group_sets(): void
+    {
+        $exam = Exam::create([
+            'title' => 'SIMULACRO CON TRES GRUPOS',
+            'total_questions' => 100,
+        ]);
+
+        foreach (['A', 'BCD', 'EF'] as $group) {
+            for ($question = 1; $question <= 100; $question++) {
+                ExamAnswerKey::create([
+                    'exam_id' => $exam->id,
+                    'academic_group' => $group,
+                    'question_number' => $question,
+                    'subject' => 'Habilidad Verbal',
+                    'correct_key' => 'A',
+                ]);
+            }
+        }
+
+        $this->get(route('exams.index'))
+            ->assertOk()
+            ->assertSee('300 / 300')
+            ->assertSee('100 por grupo x 3 grupos');
+    }
+
     public function test_export_excel_for_each_group_and_general(): void
     {
         $exam = $this->makeExamWithResults();

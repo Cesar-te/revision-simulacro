@@ -134,8 +134,13 @@
                                     <span class="text-slate-400 block text-[11px]">Claves registradas</span>
                                     <span class="text-base font-bold text-white flex items-center gap-1.5 mt-0.5">
                                         <i class="fa-solid fa-key text-amber-400 text-xs"></i>
-                                        {{ $exam->answer_keys_count }} / {{ $exam->total_questions }}
+                                        {{ $exam->answer_keys_count }} / {{ $exam->expected_answer_keys_count }}
                                     </span>
+                                    @if($exam->answer_key_groups_count > 1)
+                                        <span class="text-[10px] text-slate-500 block mt-0.5">
+                                            {{ $exam->total_questions }} por grupo x {{ $exam->answer_key_groups_count }} grupos
+                                        </span>
+                                    @endif
                                 </div>
                             </div>
                         </div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Career;
 use App\Models\Exam;
+use App\Models\ExamAnswerKey;
 use App\Models\StudentResult;
 use App\Services\ExcelExportService;
 use App\Services\ExcelImportService;
@@ -44,6 +45,18 @@ class ExamController extends Controller
         $exams = Exam::withCount(['answerKeys', 'studentResults'])
             ->latest()
             ->get();
+
+        $keyGroupCounts = ExamAnswerKey::query()
+            ->select('exam_id')
+            ->selectRaw('COUNT(DISTINCT academic_group) as groups_count')
+            ->groupBy('exam_id')
+            ->pluck('groups_count', 'exam_id');
+
+        $exams->each(function (Exam $exam) use ($keyGroupCounts): void {
+            $keyGroupsCount = max(1, (int) ($keyGroupCounts[$exam->id] ?? 0));
+            $exam->setAttribute('answer_key_groups_count', $keyGroupsCount);
+            $exam->setAttribute('expected_answer_keys_count', $exam->total_questions * $keyGroupsCount);
+        });
 
         $careers = Career::orderBy('name')->get();
 
