@@ -192,6 +192,30 @@ class SimulacroImportTest extends TestCase
         $this->assertEquals(33.0038, $score['total_score']);
     }
 
+    public function test_short_subject_codes_use_their_subject_points(): void
+    {
+        $scoring = new ScoringService;
+        $exam = Exam::create([
+            'title' => 'SIMULACRO CODIGOS CORTOS',
+            'incorrect_penalty' => -1.1250,
+            'blank_score' => 0.0,
+            'total_questions' => 1,
+        ]);
+
+        ExamAnswerKey::create([
+            'exam_id' => $exam->id,
+            'academic_group' => 'EF',
+            'question_number' => 1,
+            'subject' => 'ARIT',
+            'correct_key' => 'A',
+        ]);
+
+        $score = $scoring->scoreStudent($exam, [1 => 'A'], 'Ingenieria Civil', 'EF');
+
+        $this->assertEquals(22.222, $score['total_score']);
+        $this->assertEquals(22.222, $score['scores_detail_json'][1]['points']);
+    }
+
     public function test_any_wrong_answer_uses_flat_penalty(): void
     {
         $scoring = new ScoringService;
@@ -341,8 +365,8 @@ class SimulacroImportTest extends TestCase
             'answers_json' => [1 => 'A'],
         ]);
 
-        $rules = ScoringService::WEIGHT_CONFIG;
-        $rules['A']['VERBAL_MATE'] = 30.5;
+        $rules = ScoringService::SUBJECT_WEIGHT_CONFIG;
+        $rules['A']['HV'] = 30.5;
 
         $this->post(route('exams.scoring-rules.update', $exam), ['rules' => $rules])
             ->assertRedirect(route('exams.show', $exam));
@@ -350,7 +374,7 @@ class SimulacroImportTest extends TestCase
         $this->assertDatabaseHas('exam_scoring_rules', [
             'exam_id' => $exam->id,
             'academic_group' => 'A',
-            'category' => 'VERBAL_MATE',
+            'category' => 'HV',
             'points_correct' => 30.5,
         ]);
 

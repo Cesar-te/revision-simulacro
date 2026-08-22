@@ -487,8 +487,8 @@
                     <i class="fa-solid fa-calculator"></i>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-white">Pesos por Pregunta Correcta</h3>
-                    <p class="text-xs text-slate-400">Cada correcta suma el valor configurado por bloque. Penalidad por mala: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
+                    <h3 class="text-base font-bold text-white">Puntaje por Pregunta Correcta</h3>
+                    <p class="text-xs text-slate-400">Cada correcta suma el valor configurado por asignatura. Penalidad por mala: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
                 </div>
             </div>
             <button type="button" onclick="document.getElementById('modal-scoring-rules').classList.add('hidden')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
@@ -502,7 +502,7 @@
                 <table class="w-full text-xs text-left">
                     <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
                         <tr>
-                            <th class="py-3 px-3 min-w-52">Bloque</th>
+                            <th class="py-3 px-3 min-w-52">Asignatura</th>
                             @foreach($scoringGroups as $groupCode => $groupLabel)
                                 @php
                                     $groupMaxScore = $scoringMaxScores[$groupCode] ?? 0;

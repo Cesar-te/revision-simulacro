@@ -95,15 +95,13 @@ Si no detecta columnas de preguntas, asume que empiezan desde la columna `G`.
 
 ## Cambiar puntajes por pregunta
 
-Dentro de un simulacro abre `Puntajes`, cambia los valores por pregunta por grupo y bloque, y guarda. El sistema recalcula automaticamente los resultados existentes con esas nuevas reglas.
+Dentro de un simulacro abre `Puntajes`, cambia los valores por pregunta por grupo y asignatura, y guarda. El sistema recalcula automaticamente los resultados existentes con esas nuevas reglas.
 
-Los bloques configurables son:
+Las asignaturas configurables son:
 
-- Habilidad verbal y matematica.
-- Ciencias basicas.
-- Letras y humanidades.
-- Fisica y quimica.
-- Biologia.
+- HV, HM, ARIT, GEOM, ALG, TRIG.
+- LENG, LIT, PSIC, CIV, HIST, GEOG, ECON, FILO.
+- FIS, QUI, BIO.
 
 ## Corregir una clave oficial
 
