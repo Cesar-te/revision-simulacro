@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Career;
 use App\Models\Exam;
 use App\Models\ExamAnswerKey;
+use App\Models\ExamScoringRule;
 use App\Models\StudentResult;
 use Illuminate\Support\Collection;
 
@@ -35,6 +36,20 @@ class ScoringService
             'FISICA_QUIM' => 22.2220,
             'BIOLOGIA' => 13.0038,
         ],
+    ];
+
+    public const CATEGORY_LABELS = [
+        'VERBAL_MATE' => 'Habilidad verbal y matematica',
+        'MATE_BASIC' => 'Ciencias basicas',
+        'LETRAS' => 'Letras y humanidades',
+        'FISICA_QUIM' => 'Fisica y quimica',
+        'BIOLOGIA' => 'Biologia',
+    ];
+
+    public const GROUP_LABELS = [
+        'A' => 'Ciencias Medicas (Biomedicas)',
+        'BCD' => 'Letras / Humanidades',
+        'EF' => 'Ciencias e Ingenierias',
     ];
 
     /**
@@ -162,12 +177,56 @@ class ScoringService
     /**
      * Retorna el puntaje de respuesta correcta según la materia y el grupo académico
      */
-    public function getPointsForCorrect(string $subject, string $group): float
+    public function ensureScoringRules(Exam $exam): void
+    {
+        foreach (self::WEIGHT_CONFIG as $group => $categories) {
+            foreach ($categories as $category => $points) {
+                ExamScoringRule::firstOrCreate(
+                    [
+                        'exam_id' => $exam->id,
+                        'academic_group' => $group,
+                        'category' => $category,
+                    ],
+                    [
+                        'points_correct' => $points,
+                    ]
+                );
+            }
+        }
+    }
+
+    /**
+     * @return array<string, array<string, float>>
+     */
+    public function getScoringRulesMatrix(Exam $exam): array
+    {
+        $this->ensureScoringRules($exam);
+
+        $matrix = self::WEIGHT_CONFIG;
+        $rules = ExamScoringRule::where('exam_id', $exam->id)->get();
+
+        foreach ($rules as $rule) {
+            $group = $this->normalizeGroup($rule->academic_group);
+            if (! isset($matrix[$group])) {
+                continue;
+            }
+
+            $matrix[$group][$rule->category] = (float) $rule->points_correct;
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * @param  array<string, array<string, float>>|null  $rulesMatrix
+     */
+    public function getPointsForCorrect(Exam $exam, string $subject, string $group, ?array $rulesMatrix = null): float
     {
         $groupKey = $this->normalizeGroup($group);
         $category = $this->getSubjectCategory($subject);
+        $rulesMatrix ??= $this->getScoringRulesMatrix($exam);
 
-        return self::WEIGHT_CONFIG[$groupKey][$category] ?? 20.0000;
+        return $rulesMatrix[$groupKey][$category] ?? self::WEIGHT_CONFIG[$groupKey][$category] ?? 20.0000;
     }
 
     /**
@@ -249,6 +308,7 @@ class ScoringService
         };
 
         $answerKeys = $this->getAnswerKeysForGroup($exam, $groupCode);
+        $rulesMatrix = $this->getScoringRulesMatrix($exam);
         $penalty = (float) $exam->incorrect_penalty; // e.g. -1.1250
         if ($penalty > 0) {
             $penalty = -$penalty; // aseguramos que sea negativa
@@ -271,7 +331,7 @@ class ScoringService
             $correctKey = $keyObj ? strtoupper(trim($keyObj->correct_key)) : '';
             $isAnnulled = $keyObj ? $keyObj->is_annulled : false;
 
-            $ptsCorrect = $this->getPointsForCorrect($subject, $groupCode);
+            $ptsCorrect = $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix);
 
             $status = 'blank';
             $questionScore = 0.0;

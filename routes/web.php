@@ -23,6 +23,7 @@ Route::prefix('exams')->name('exams.')->middleware('auth')->group(function () {
 
     Route::post('/{exam}/upload-keys', [ExamController::class, 'uploadKeys'])->name('upload-keys');
     Route::post('/{exam}/upload-responses', [ExamController::class, 'uploadResponses'])->name('upload-responses');
+    Route::post('/{exam}/scoring-rules', [ExamController::class, 'updateScoringRules'])->name('scoring-rules.update');
     Route::post('/{exam}/recalculate', [ExamController::class, 'recalculateAll'])->name('recalculate');
     Route::get('/{exam}/export', [ExamController::class, 'export'])->name('export');
     Route::get('/{exam}/export-pdf', [ExamController::class, 'exportPdf'])->name('export-pdf');

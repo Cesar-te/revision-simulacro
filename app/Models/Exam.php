@@ -34,4 +34,11 @@ class Exam extends Model
     {
         return $this->hasMany(StudentResult::class)->orderBy('general_rank');
     }
+
+    public function scoringRules(): HasMany
+    {
+        return $this->hasMany(ExamScoringRule::class)
+            ->orderBy('academic_group')
+            ->orderBy('category');
+    }
 }

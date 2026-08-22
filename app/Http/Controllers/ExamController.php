@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Career;
 use App\Models\Exam;
 use App\Models\ExamAnswerKey;
+use App\Models\ExamScoringRule;
 use App\Models\StudentResult;
 use App\Services\ExcelExportService;
 use App\Services\ExcelImportService;
@@ -98,6 +99,7 @@ class ExamController extends Controller
             'blank_score' => $request->input('blank_score', 0.0000),
             'total_questions' => $request->input('total_questions', 100),
         ]);
+        $this->scoringService->ensureScoringRules($exam);
 
         $errors = [];
 
@@ -204,6 +206,9 @@ class ExamController extends Controller
             'ALL' => $exam->answerKeys()->where('academic_group', 'ALL')->count(),
         ];
         $subjectColumns = ScoringService::SUBJECT_COLUMNS;
+        $scoringRules = $this->scoringService->getScoringRulesMatrix($exam);
+        $scoringCategories = ScoringService::CATEGORY_LABELS;
+        $scoringGroups = ScoringService::GROUP_LABELS;
 
         return view('exams.show', compact(
             'exam',
@@ -216,7 +221,10 @@ class ExamController extends Controller
             'careersList',
             'answerKeys',
             'keysByGroup',
-            'subjectColumns'
+            'subjectColumns',
+            'scoringRules',
+            'scoringCategories',
+            'scoringGroups'
         ));
     }
 
@@ -318,23 +326,44 @@ class ExamController extends Controller
      */
     public function recalculateAll(Exam $exam)
     {
-        $results = StudentResult::where('exam_id', $exam->id)->get();
-        foreach ($results as $res) {
-            $scoreData = $this->scoringService->scoreStudent($exam, $res->answers_json ?? [], $res->career, $res->academic_group);
-            $res->update([
-                'academic_group' => $scoreData['academic_group'],
-                'group_label' => $scoreData['group_label'],
-                'correct_count' => $scoreData['correct_count'],
-                'incorrect_count' => $scoreData['incorrect_count'],
-                'blank_count' => $scoreData['blank_count'],
-                'total_score' => $scoreData['total_score'],
-                'scores_detail_json' => $scoreData['scores_detail_json'],
-            ]);
-        }
-
-        $this->scoringService->recalculateRanks($exam);
+        $this->recalculateExamResults($exam);
 
         return redirect()->route('exams.show', $exam)->with('success', 'Puntajes y rankings recalculados exitosamente.');
+    }
+
+    /**
+     * Actualiza los puntajes por grupo/bloque y recalcula resultados.
+     */
+    public function updateScoringRules(Request $request, Exam $exam)
+    {
+        $request->validate([
+            'rules' => ['required', 'array'],
+            'rules.*' => ['required', 'array'],
+            'rules.*.*' => ['required', 'numeric', 'min:0', 'max:1000'],
+        ]);
+
+        $this->scoringService->ensureScoringRules($exam);
+
+        foreach (ScoringService::WEIGHT_CONFIG as $group => $categories) {
+            foreach (array_keys($categories) as $category) {
+                $points = (float) data_get($request->input('rules'), "{$group}.{$category}", $categories[$category]);
+
+                ExamScoringRule::updateOrCreate(
+                    [
+                        'exam_id' => $exam->id,
+                        'academic_group' => $group,
+                        'category' => $category,
+                    ],
+                    [
+                        'points_correct' => round($points, 4),
+                    ]
+                );
+            }
+        }
+
+        $this->recalculateExamResults($exam);
+
+        return redirect()->route('exams.show', $exam)->with('success', 'Puntajes por pregunta actualizados y resultados recalculados.');
     }
 
     /**
@@ -381,6 +410,25 @@ class ExamController extends Controller
         $exam->delete();
 
         return redirect()->route('exams.index')->with('success', 'Simulacro eliminado.');
+    }
+
+    private function recalculateExamResults(Exam $exam): void
+    {
+        $results = StudentResult::where('exam_id', $exam->id)->get();
+        foreach ($results as $res) {
+            $scoreData = $this->scoringService->scoreStudent($exam, $res->answers_json ?? [], $res->career, $res->academic_group);
+            $res->update([
+                'academic_group' => $scoreData['academic_group'],
+                'group_label' => $scoreData['group_label'],
+                'correct_count' => $scoreData['correct_count'],
+                'incorrect_count' => $scoreData['incorrect_count'],
+                'blank_count' => $scoreData['blank_count'],
+                'total_score' => $scoreData['total_score'],
+                'scores_detail_json' => $scoreData['scores_detail_json'],
+            ]);
+        }
+
+        $this->scoringService->recalculateRanks($exam);
     }
 
     private function hasAnyFile(Request $request, array $fields): bool

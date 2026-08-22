@@ -250,6 +250,49 @@ class SimulacroImportTest extends TestCase
             ->assertSee('100 por grupo x 3 grupos');
     }
 
+    public function test_admin_can_update_scoring_rules_and_recalculate_results(): void
+    {
+        $exam = Exam::create([
+            'title' => 'SIMULACRO PUNTAJES EDITABLES',
+            'incorrect_penalty' => -1.1250,
+            'blank_score' => 0,
+            'total_questions' => 1,
+        ]);
+
+        ExamAnswerKey::create([
+            'exam_id' => $exam->id,
+            'academic_group' => 'A',
+            'question_number' => 1,
+            'subject' => 'Habilidad Verbal',
+            'correct_key' => 'A',
+        ]);
+
+        StudentResult::create([
+            'exam_id' => $exam->id,
+            'full_name' => 'Alumno Editable',
+            'career' => 'Medicina Humana',
+            'academic_group' => 'A',
+            'answers_json' => [1 => 'A'],
+        ]);
+
+        $rules = ScoringService::WEIGHT_CONFIG;
+        $rules['A']['VERBAL_MATE'] = 30.5;
+
+        $this->post(route('exams.scoring-rules.update', $exam), ['rules' => $rules])
+            ->assertRedirect(route('exams.show', $exam));
+
+        $this->assertDatabaseHas('exam_scoring_rules', [
+            'exam_id' => $exam->id,
+            'academic_group' => 'A',
+            'category' => 'VERBAL_MATE',
+            'points_correct' => 30.5,
+        ]);
+
+        $student = StudentResult::where('exam_id', $exam->id)->firstOrFail();
+        $this->assertEquals(30.5, $student->total_score);
+        $this->assertEquals(1, $student->general_rank);
+    }
+
     public function test_export_excel_for_each_group_and_general(): void
     {
         $exam = $this->makeExamWithResults();

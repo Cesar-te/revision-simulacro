@@ -39,6 +39,12 @@
                 <span>Claves Oficiales</span>
             </button>
 
+            <!-- Modal Puntajes -->
+            <button onclick="document.getElementById('modal-scoring-rules').classList.remove('hidden')" class="px-3.5 py-2 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-colors flex items-center gap-2">
+                <i class="fa-solid fa-calculator text-cyan-400"></i>
+                <span>Puntajes</span>
+            </button>
+
             <!-- Modal Subir Respuestas -->
             <button onclick="document.getElementById('modal-upload-responses').classList.remove('hidden')" class="px-3.5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2">
                 <i class="fa-solid fa-file-arrow-up"></i>
@@ -469,6 +475,65 @@
                 </div>
             </form>
         </div>
+    </div>
+</div>
+
+<!-- MODAL: Configurar Puntajes por Pregunta -->
+<div id="modal-scoring-rules" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full p-6 shadow-2xl relative max-h-[92vh] flex flex-col">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                    <i class="fa-solid fa-calculator"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Puntajes por Pregunta Correcta</h3>
+                    <p class="text-xs text-slate-400">Penalidad: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
+                </div>
+            </div>
+            <button type="button" onclick="document.getElementById('modal-scoring-rules').classList.add('hidden')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form action="{{ route('exams.scoring-rules.update', $exam) }}" method="POST" class="mt-4 overflow-y-auto flex-1 pr-1">
+            @csrf
+            <div class="overflow-x-auto border border-slate-800 rounded-xl">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                        <tr>
+                            <th class="py-3 px-3 min-w-52">Bloque</th>
+                            @foreach($scoringGroups as $groupCode => $groupLabel)
+                                <th class="py-3 px-3 min-w-44 text-center">{{ $groupLabel }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800 bg-slate-900/50">
+                        @foreach($scoringCategories as $categoryCode => $categoryLabel)
+                            <tr>
+                                <td class="py-3 px-3">
+                                    <div class="font-bold text-slate-200">{{ $categoryLabel }}</div>
+                                    <div class="text-[10px] text-slate-500 font-mono">{{ $categoryCode }}</div>
+                                </td>
+                                @foreach($scoringGroups as $groupCode => $groupLabel)
+                                    <td class="py-3 px-3">
+                                        <input type="number" step="0.0001" min="0" max="1000" name="rules[{{ $groupCode }}][{{ $categoryCode }}]" value="{{ number_format($scoringRules[$groupCode][$categoryCode] ?? 0, 4, '.', '') }}" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white text-right font-mono focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
+                                    </td>
+                                @endforeach
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pt-4 flex items-center justify-end gap-3">
+                <button type="button" onclick="document.getElementById('modal-scoring-rules').classList.add('hidden')" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">Cancelar</button>
+                <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-lg shadow-lg shadow-cyan-500/20 transition-all inline-flex items-center gap-2">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    <span>Guardar y Recalcular</span>
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 

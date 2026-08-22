@@ -9,6 +9,7 @@ Sistema interno para administradores que importa claves y respuestas desde Excel
 - Importacion de respuestas por grupo sin borrar resultados de otros grupos.
 - Calculo de puntaje con penalidad por incorrecta, blancos y preguntas anuladas.
 - Ranking general, por grupo academico y por carrera.
+- Puntajes por pregunta editables por simulacro, grupo y bloque.
 - Filtros por grupo, carrera, nombre y DNI.
 - Exportacion Excel con hojas General, Biomedicas, Letras e Ingenierias.
 - Exportacion PDF horizontal para publicacion o impresion.
@@ -88,6 +89,19 @@ Si no detecta columnas de preguntas, asume que empiezan desde la columna `G`.
 - Si el mismo DNI aparece con nombres distintos, se conserva como filas separadas.
 - Si coinciden examen, grupo, DNI y nombre, se actualiza la fila existente.
 - Si se fuerza un grupo al importar, ese grupo manda sobre la carrera detectada.
+- Cada simulacro conserva sus propias reglas de puntaje. Cambiar los puntajes de un simulacro no cambia los anteriores ni los futuros.
+
+## Cambiar puntajes por pregunta
+
+Dentro de un simulacro abre `Puntajes`, cambia los valores por grupo y bloque, y guarda. El sistema recalcula automaticamente los resultados existentes con esas nuevas reglas.
+
+Los bloques configurables son:
+
+- Habilidad verbal y matematica.
+- Ciencias basicas.
+- Letras y humanidades.
+- Fisica y quimica.
+- Biologia.
 
 ## Comandos utiles
 
