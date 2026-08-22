@@ -487,8 +487,8 @@
                     <i class="fa-solid fa-calculator"></i>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-white">Puntajes por Pregunta Correcta</h3>
-                    <p class="text-xs text-slate-400">Penalidad: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
+                    <h3 class="text-base font-bold text-white">Pesos por Pregunta Correcta</h3>
+                    <p class="text-xs text-slate-400">En simulacros de 100 preguntas, las correctas se normalizan a 2000 pts. Penalidad: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
                 </div>
             </div>
             <button type="button" onclick="document.getElementById('modal-scoring-rules').classList.add('hidden')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">

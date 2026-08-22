@@ -11,6 +11,10 @@ use Illuminate\Support\Collection;
 
 class ScoringService
 {
+    public const TARGET_TOTAL_QUESTIONS = 100;
+
+    public const TARGET_MAX_SCORE = 2000.0;
+
     /**
      * Ponderaciones por defecto por Asignatura / Bloque y Grupo Académico
      */
@@ -230,6 +234,37 @@ class ScoringService
     }
 
     /**
+     * @param  Collection<int, ExamAnswerKey>  $answerKeys
+     * @param  array<string, array<string, float>>  $rulesMatrix
+     */
+    public function getCorrectPointScaleFactor(Exam $exam, string $groupCode, Collection $answerKeys, array $rulesMatrix): float
+    {
+        $totalQuestions = $exam->total_questions > 0 ? $exam->total_questions : $answerKeys->count();
+
+        if ($totalQuestions !== self::TARGET_TOTAL_QUESTIONS || $answerKeys->count() < $totalQuestions) {
+            return 1.0;
+        }
+
+        $maxRawScore = 0.0;
+        for ($i = 1; $i <= $totalQuestions; $i++) {
+            /** @var ExamAnswerKey|null $keyObj */
+            $keyObj = $answerKeys->get($i);
+            if (! $keyObj) {
+                return 1.0;
+            }
+
+            $subject = $keyObj->subject ?? 'General';
+            $maxRawScore += $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix);
+        }
+
+        if ($maxRawScore <= 0) {
+            return 1.0;
+        }
+
+        return self::TARGET_MAX_SCORE / $maxRawScore;
+    }
+
+    /**
      * Normaliza el código de grupo ('A', 'B', 'C', 'D', 'E', 'F', 'BCD', 'EF')
      */
     public function normalizeGroup(string $group): string
@@ -309,6 +344,7 @@ class ScoringService
 
         $answerKeys = $this->getAnswerKeysForGroup($exam, $groupCode);
         $rulesMatrix = $this->getScoringRulesMatrix($exam);
+        $correctPointScaleFactor = $this->getCorrectPointScaleFactor($exam, $groupCode, $answerKeys, $rulesMatrix);
         $penalty = (float) $exam->incorrect_penalty; // e.g. -1.1250
         if ($penalty > 0) {
             $penalty = -$penalty; // aseguramos que sea negativa
@@ -331,7 +367,7 @@ class ScoringService
             $correctKey = $keyObj ? strtoupper(trim($keyObj->correct_key)) : '';
             $isAnnulled = $keyObj ? $keyObj->is_annulled : false;
 
-            $ptsCorrect = $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix);
+            $ptsCorrect = $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix) * $correctPointScaleFactor;
 
             $status = 'blank';
             $questionScore = 0.0;

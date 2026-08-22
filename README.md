@@ -91,10 +91,11 @@ Si no detecta columnas de preguntas, asume que empiezan desde la columna `G`.
 - Si coinciden examen, grupo, DNI y nombre, se actualiza la fila existente.
 - Si se fuerza un grupo al importar, ese grupo manda sobre la carrera detectada.
 - Cada simulacro conserva sus propias reglas de puntaje. Cambiar los puntajes de un simulacro no cambia los anteriores ni los futuros.
+- En simulacros de 100 preguntas con claves completas, los puntos correctos se normalizan para que 100 buenas sumen `2000.0000` en cualquier grupo. La penalidad por mala y el puntaje en blanco no se escalan.
 
 ## Cambiar puntajes por pregunta
 
-Dentro de un simulacro abre `Puntajes`, cambia los valores por grupo y bloque, y guarda. El sistema recalcula automaticamente los resultados existentes con esas nuevas reglas.
+Dentro de un simulacro abre `Puntajes`, cambia los pesos base por grupo y bloque, y guarda. El sistema recalcula automaticamente los resultados existentes con esas nuevas reglas.
 
 Los bloques configurables son:
 
