@@ -209,6 +209,10 @@ class ExamController extends Controller
         $scoringRules = $this->scoringService->getScoringRulesMatrix($exam);
         $scoringCategories = ScoringService::CATEGORY_LABELS;
         $scoringGroups = ScoringService::GROUP_LABELS;
+        $scoringMaxScores = [];
+        foreach (array_keys($scoringGroups) as $groupCode) {
+            $scoringMaxScores[$groupCode] = $this->scoringService->getMaximumCorrectScoreForGroup($exam, $groupCode);
+        }
 
         return view('exams.show', compact(
             'exam',
@@ -224,7 +228,8 @@ class ExamController extends Controller
             'subjectColumns',
             'scoringRules',
             'scoringCategories',
-            'scoringGroups'
+            'scoringGroups',
+            'scoringMaxScores'
         ));
     }
 

@@ -11,10 +11,6 @@ use Illuminate\Support\Collection;
 
 class ScoringService
 {
-    public const TARGET_TOTAL_QUESTIONS = 100;
-
-    public const TARGET_MAX_SCORE = 2000.0;
-
     /**
      * Ponderaciones por defecto por Asignatura / Bloque y Grupo Académico
      */
@@ -234,37 +230,6 @@ class ScoringService
     }
 
     /**
-     * @param  Collection<int, ExamAnswerKey>  $answerKeys
-     * @param  array<string, array<string, float>>  $rulesMatrix
-     */
-    public function getCorrectPointScaleFactor(Exam $exam, string $groupCode, Collection $answerKeys, array $rulesMatrix): float
-    {
-        $totalQuestions = $exam->total_questions > 0 ? $exam->total_questions : $answerKeys->count();
-
-        if ($totalQuestions !== self::TARGET_TOTAL_QUESTIONS || $answerKeys->count() < $totalQuestions) {
-            return 1.0;
-        }
-
-        $maxRawScore = 0.0;
-        for ($i = 1; $i <= $totalQuestions; $i++) {
-            /** @var ExamAnswerKey|null $keyObj */
-            $keyObj = $answerKeys->get($i);
-            if (! $keyObj) {
-                return 1.0;
-            }
-
-            $subject = $keyObj->subject ?? 'General';
-            $maxRawScore += $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix);
-        }
-
-        if ($maxRawScore <= 0) {
-            return 1.0;
-        }
-
-        return self::TARGET_MAX_SCORE / $maxRawScore;
-    }
-
-    /**
      * Normaliza el código de grupo ('A', 'B', 'C', 'D', 'E', 'F', 'BCD', 'EF')
      */
     public function normalizeGroup(string $group): string
@@ -328,6 +293,22 @@ class ScoringService
     }
 
     /**
+     * Suma el maximo posible con las claves cargadas y los puntajes vigentes.
+     */
+    public function getMaximumCorrectScoreForGroup(Exam $exam, string $groupCode): float
+    {
+        $answerKeys = $this->getAnswerKeysForGroup($exam, $this->normalizeGroup($groupCode));
+        $rulesMatrix = $this->getScoringRulesMatrix($exam);
+        $total = 0.0;
+
+        foreach ($answerKeys as $key) {
+            $total += $this->getPointsForCorrect($exam, $key->subject ?? 'General', $groupCode, $rulesMatrix);
+        }
+
+        return round($total, 4);
+    }
+
+    /**
      * Califica las respuestas de un estudiante contra las claves del examen
      */
     public function scoreStudent(Exam $exam, array $studentAnswers, string $careerName, ?string $forcedGroup = null): array
@@ -344,7 +325,6 @@ class ScoringService
 
         $answerKeys = $this->getAnswerKeysForGroup($exam, $groupCode);
         $rulesMatrix = $this->getScoringRulesMatrix($exam);
-        $correctPointScaleFactor = $this->getCorrectPointScaleFactor($exam, $groupCode, $answerKeys, $rulesMatrix);
         $penalty = (float) $exam->incorrect_penalty; // e.g. -1.1250
         if ($penalty > 0) {
             $penalty = -$penalty; // aseguramos que sea negativa
@@ -367,7 +347,7 @@ class ScoringService
             $correctKey = $keyObj ? strtoupper(trim($keyObj->correct_key)) : '';
             $isAnnulled = $keyObj ? $keyObj->is_annulled : false;
 
-            $ptsCorrect = $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix) * $correctPointScaleFactor;
+            $ptsCorrect = $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix);
 
             $status = 'blank';
             $questionScore = 0.0;

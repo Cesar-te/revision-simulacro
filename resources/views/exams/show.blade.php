@@ -488,7 +488,7 @@
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-white">Pesos por Pregunta Correcta</h3>
-                    <p class="text-xs text-slate-400">En simulacros de 100 preguntas, las correctas se normalizan a 2000 pts. Penalidad: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
+                    <p class="text-xs text-slate-400">Cada correcta suma el valor configurado por bloque. Penalidad por mala: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
                 </div>
             </div>
             <button type="button" onclick="document.getElementById('modal-scoring-rules').classList.add('hidden')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
@@ -504,7 +504,16 @@
                         <tr>
                             <th class="py-3 px-3 min-w-52">Bloque</th>
                             @foreach($scoringGroups as $groupCode => $groupLabel)
-                                <th class="py-3 px-3 min-w-44 text-center">{{ $groupLabel }}</th>
+                                @php
+                                    $groupMaxScore = $scoringMaxScores[$groupCode] ?? 0;
+                                    $groupMaxClass = abs($groupMaxScore - 2000) < 0.01 ? 'text-emerald-400' : 'text-rose-400';
+                                @endphp
+                                <th class="py-3 px-3 min-w-44 text-center">
+                                    <div>{{ $groupLabel }}</div>
+                                    <div class="mt-1 text-[10px] font-bold normal-case tracking-normal {{ $groupMaxClass }}">
+                                        Max. buenas: {{ number_format($groupMaxScore, 4) }}
+                                    </div>
+                                </th>
                             @endforeach
                         </tr>
                     </thead>

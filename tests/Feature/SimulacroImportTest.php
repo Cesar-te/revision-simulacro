@@ -160,63 +160,70 @@ class SimulacroImportTest extends TestCase
         $this->assertEquals(1, $stEF->fresh()->group_rank);
     }
 
-    public function test_all_correct_scores_are_normalized_to_2000_for_all_groups(): void
-    {
-        $scoring = new ScoringService;
-
-        foreach (['A', 'BCD', 'EF'] as $group) {
-            $exam = Exam::create([
-                'title' => "SIMULACRO MAXIMO {$group}",
-                'incorrect_penalty' => -1.1250,
-                'blank_score' => 0.0,
-                'total_questions' => 100,
-            ]);
-
-            foreach ($this->officialSubjectDistribution() as $question => $subject) {
-                ExamAnswerKey::create([
-                    'exam_id' => $exam->id,
-                    'academic_group' => $group,
-                    'question_number' => $question,
-                    'subject' => $subject,
-                    'correct_key' => 'A',
-                ]);
-            }
-
-            $score = $scoring->scoreStudent($exam, array_fill(1, 100, 'A'), 'Ingenieria Civil', $group);
-
-            $this->assertEquals(100, $score['correct_count']);
-            $this->assertEquals(2000.0, $score['total_score'], "Grupo {$group} no suma 2000 con 100 correctas.");
-        }
-    }
-
-    public function test_incorrect_penalty_is_not_scaled_when_normalizing_correct_points(): void
+    public function test_correct_answers_use_configured_question_values_without_hidden_scaling(): void
     {
         $scoring = new ScoringService;
         $exam = Exam::create([
-            'title' => 'SIMULACRO PENALIDAD SIN ESCALA',
+            'title' => 'SIMULACRO CALCULO LITERAL',
             'incorrect_penalty' => -1.1250,
             'blank_score' => 0.0,
-            'total_questions' => 100,
+            'total_questions' => 2,
         ]);
 
-        foreach ($this->officialSubjectDistribution() as $question => $subject) {
-            ExamAnswerKey::create([
-                'exam_id' => $exam->id,
-                'academic_group' => 'EF',
-                'question_number' => $question,
-                'subject' => $subject,
-                'correct_key' => 'A',
-            ]);
-        }
+        ExamAnswerKey::create([
+            'exam_id' => $exam->id,
+            'academic_group' => 'EF',
+            'question_number' => 1,
+            'subject' => 'Habilidad Verbal',
+            'correct_key' => 'A',
+        ]);
 
-        $answers = array_fill(1, 100, 'A');
-        $answers[1] = 'B';
+        ExamAnswerKey::create([
+            'exam_id' => $exam->id,
+            'academic_group' => 'EF',
+            'question_number' => 2,
+            'subject' => 'Biologia',
+            'correct_key' => 'A',
+        ]);
 
-        $score = $scoring->scoreStudent($exam, $answers, 'Ingenieria Civil', 'EF');
+        $score = $scoring->scoreStudent($exam, [1 => 'A', 2 => 'A'], 'Ingenieria Civil', 'EF');
 
-        $this->assertEquals(99, $score['correct_count']);
+        $this->assertEquals(2, $score['correct_count']);
+        $this->assertEquals(33.0038, $score['total_score']);
+    }
+
+    public function test_any_wrong_answer_uses_flat_penalty(): void
+    {
+        $scoring = new ScoringService;
+        $exam = Exam::create([
+            'title' => 'SIMULACRO PENALIDAD PLANA',
+            'incorrect_penalty' => -1.1250,
+            'blank_score' => 0.0,
+            'total_questions' => 2,
+        ]);
+
+        ExamAnswerKey::create([
+            'exam_id' => $exam->id,
+            'academic_group' => 'EF',
+            'question_number' => 1,
+            'subject' => 'Habilidad Verbal',
+            'correct_key' => 'A',
+        ]);
+
+        ExamAnswerKey::create([
+            'exam_id' => $exam->id,
+            'academic_group' => 'EF',
+            'question_number' => 2,
+            'subject' => 'Biologia',
+            'correct_key' => 'A',
+        ]);
+
+        $score = $scoring->scoreStudent($exam, [1 => 'A', 2 => 'B'], 'Ingenieria Civil', 'EF');
+
+        $this->assertEquals(1, $score['correct_count']);
         $this->assertEquals(1, $score['incorrect_count']);
-        $this->assertEquals(-1.125, $score['scores_detail_json'][1]['points']);
+        $this->assertEquals(18.875, $score['total_score']);
+        $this->assertEquals(-1.125, $score['scores_detail_json'][2]['points']);
     }
 
     public function test_importing_different_groups_does_not_delete_other_groups(): void
@@ -529,39 +536,6 @@ class SimulacroImportTest extends TestCase
         }
 
         return $this->writeSpreadsheet($spreadsheet, 'keys');
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function officialSubjectDistribution(): array
-    {
-        $subjects = [];
-        foreach ([
-            'Habilidad Verbal' => 20,
-            'Habilidad Matematica' => 20,
-            'Aritmetica' => 3,
-            'Geometria' => 2,
-            'Algebra' => 3,
-            'Trigonometria' => 2,
-            'Lenguaje' => 3,
-            'Literatura' => 2,
-            'Psicologia' => 3,
-            'Educacion Civica' => 2,
-            'Historia' => 2,
-            'Geografia' => 2,
-            'Economia' => 2,
-            'Filosofia' => 2,
-            'Fisica' => 6,
-            'Quimica' => 8,
-            'Biologia' => 18,
-        ] as $subject => $count) {
-            for ($i = 0; $i < $count; $i++) {
-                $subjects[] = $subject;
-            }
-        }
-
-        return array_combine(range(1, count($subjects)), $subjects);
     }
 
     /**
