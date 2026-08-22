@@ -61,9 +61,10 @@ class ScoringService
         ],
         'BCD' => [
             'VERBAL_MATE' => 40,
-            'LETRAS' => 34,
             'MATE_BASIC' => 15,
-            'FISICA_QUIM' => 11,
+            'LETRAS' => 34,
+            'FISICA_QUIM' => 6,
+            'BIOLOGIA' => 5,
         ],
         'EF' => [
             'VERBAL_MATE' => 40,
