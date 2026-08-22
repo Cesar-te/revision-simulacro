@@ -12,6 +12,7 @@ class ExamAnswerKey extends Model
 
     protected $fillable = [
         'exam_id',
+        'academic_group',
         'question_number',
         'subject',
         'correct_key',

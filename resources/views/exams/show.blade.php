@@ -17,11 +17,18 @@
                     {{ $exam->total_questions }} Preguntas
                 </span>
             </div>
-            <p class="text-xs text-slate-400 mt-1">
-                Penalidad: <span class="text-rose-400 font-semibold">{{ $exam->incorrect_penalty }} pts</span> | 
-                En blanco: <span class="text-slate-300 font-semibold">{{ $exam->blank_score }} pts</span> | 
-                Claves registradas: <span class="text-amber-400 font-semibold">{{ $answerKeys->count() }} / {{ $exam->total_questions }}</span>
-            </p>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mt-2">
+                <span>Penalidad: <strong class="text-rose-400">{{ $exam->incorrect_penalty }} pts</strong></span> •
+                <span>En blanco: <strong class="text-slate-300">{{ $exam->blank_score }} pts</strong></span> •
+                <span>Claves cargadas:
+                    <span class="text-rose-300 font-semibold" title="Grupo A">A: {{ $keysByGroup['A'] }}</span> |
+                    <span class="text-amber-300 font-semibold" title="Grupo BCD">BCD: {{ $keysByGroup['BCD'] }}</span> |
+                    <span class="text-cyan-300 font-semibold" title="Grupo EF">EF: {{ $keysByGroup['EF'] }}</span>
+                    @if($keysByGroup['ALL'] > 0)
+                        | <span class="text-slate-300 font-semibold" title="General">Gen: {{ $keysByGroup['ALL'] }}</span>
+                    @endif
+                </span>
+            </div>
         </div>
 
         <!-- Action Buttons -->
@@ -35,7 +42,7 @@
             <!-- Modal Subir Respuestas -->
             <button onclick="document.getElementById('modal-upload-responses').classList.remove('hidden')" class="px-3.5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2">
                 <i class="fa-solid fa-file-arrow-up"></i>
-                <span>Importar Respuestas (Excel)</span>
+                <span>Importar Respuestas</span>
             </button>
 
             <!-- Recalcular -->
@@ -47,10 +54,16 @@
                     </button>
                 </form>
 
-                <!-- Exportar Excel -->
-                <a href="{{ route('exams.export', ['exam' => $exam, 'group' => request('group'), 'career' => request('career')]) }}" class="px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2">
+                <!-- Exportar Excel con 4 Hojas -->
+                <a href="{{ route('exams.export', ['exam' => $exam, 'career' => request('career')]) }}" class="px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2" title="Descargar archivo Excel con 4 pestañas: General, Biomédicas (A), Letras (BCD) e Ingenierías (EF)">
                     <i class="fa-solid fa-file-excel"></i>
-                    <span>Exportar Orden de Mérito</span>
+                    <span>Exportar Excel</span>
+                </a>
+
+                <!-- Exportar PDF Horizontal -->
+                <a href="{{ route('exams.export-pdf', ['exam' => $exam, 'group' => request('group')]) }}" target="_blank" class="px-3.5 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded-xl shadow-md shadow-rose-500/20 transition-all flex items-center gap-2" title="Descargar PDF en hoja horizontal con las 17 asignaturas y orden de mérito">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span>Exportar PDF (Horizontal)</span>
                 </a>
             @endif
         </div>
@@ -89,14 +102,14 @@
         <div class="glass-card rounded-2xl p-4 border border-slate-800">
             <span class="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">Puntaje Mínimo</span>
             <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-extrabold text-slate-300">{{ number_format($minScore, 4) }}</span>
+                <span class="text-2xl font-extrabold {{ $minScore < 0 ? 'text-rose-400' : 'text-slate-300' }}">{{ number_format($minScore, 4) }}</span>
                 <span class="text-xs text-slate-500">pts</span>
             </div>
         </div>
 
         <!-- Distribución Grupos -->
         <div class="glass-card rounded-2xl p-4 border border-slate-800 col-span-2 lg:col-span-1">
-            <span class="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">Por Grupo</span>
+            <span class="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">Alumnos por Grupo</span>
             <div class="flex items-center gap-2 mt-1.5 text-xs font-semibold">
                 <span class="text-rose-400" title="Biomédicas">A: {{ $groupsCount['A'] }}</span> •
                 <span class="text-amber-400" title="Letras">BCD: {{ $groupsCount['BCD'] }}</span> •
@@ -105,22 +118,37 @@
         </div>
     </div>
 
-    <!-- Filters and Search Bar -->
+    <!-- Filters and Academic Group Tabs -->
     <div class="glass-card rounded-2xl p-4 border border-slate-800">
         <form method="GET" action="{{ route('exams.show', $exam) }}" class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-            <!-- Academic Group Pills -->
-            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-                <a href="{{ route('exams.show', ['exam' => $exam, 'career' => request('career'), 'search' => request('search')]) }}" class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors {{ !request('group') || request('group') === 'all' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800' }}">
-                    Todos los Grupos
+            <!-- Academic Group Tabs / Pills -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                <!-- Tab General -->
+                <a href="{{ route('exams.show', ['exam' => $exam, 'career' => request('career'), 'search' => request('search')]) }}" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 {{ !request('group') || request('group') === 'all' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'bg-slate-800/70 text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                    <i class="fa-solid fa-globe"></i>
+                    <span>Tabla General</span>
+                    <span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] {{ !request('group') || request('group') === 'all' ? 'bg-white/20 text-white' : 'bg-slate-700 text-slate-300' }}">{{ $totalStudents }}</span>
                 </a>
-                <a href="{{ route('exams.show', ['exam' => $exam, 'group' => 'A', 'career' => request('career'), 'search' => request('search')]) }}" class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors {{ request('group') === 'A' ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20' : 'bg-slate-800/80 text-rose-400/80 hover:text-rose-300 hover:bg-slate-800' }}">
-                    Grupo A (Biomédicas)
+
+                <!-- Tab Biomédicas A -->
+                <a href="{{ route('exams.show', ['exam' => $exam, 'group' => 'A', 'career' => request('career'), 'search' => request('search')]) }}" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request('group') === 'A' ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20' : 'bg-slate-800/70 text-rose-400 hover:text-rose-200 hover:bg-slate-800' }}">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                    <span>Biomédicas (A)</span>
+                    <span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] {{ request('group') === 'A' ? 'bg-white/20 text-white' : 'bg-rose-500/10 text-rose-300 border border-rose-500/20' }}">{{ $groupsCount['A'] }}</span>
                 </a>
-                <a href="{{ route('exams.show', ['exam' => $exam, 'group' => 'BCD', 'career' => request('career'), 'search' => request('search')]) }}" class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors {{ request('group') === 'BCD' ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20' : 'bg-slate-800/80 text-amber-400/80 hover:text-amber-300 hover:bg-slate-800' }}">
-                    Grupo B, C, D (Letras)
+
+                <!-- Tab Letras BCD -->
+                <a href="{{ route('exams.show', ['exam' => $exam, 'group' => 'BCD', 'career' => request('career'), 'search' => request('search')]) }}" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request('group') === 'BCD' ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20' : 'bg-slate-800/70 text-amber-400 hover:text-amber-200 hover:bg-slate-800' }}">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>Letras (BCD)</span>
+                    <span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] {{ request('group') === 'BCD' ? 'bg-white/20 text-white' : 'bg-amber-500/10 text-amber-300 border border-amber-500/20' }}">{{ $groupsCount['BCD'] }}</span>
                 </a>
-                <a href="{{ route('exams.show', ['exam' => $exam, 'group' => 'EF', 'career' => request('career'), 'search' => request('search')]) }}" class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors {{ request('group') === 'EF' ? 'bg-cyan-600 text-white shadow-md shadow-cyan-500/20' : 'bg-slate-800/80 text-cyan-400/80 hover:text-cyan-300 hover:bg-slate-800' }}">
-                    Grupo E, F (Ingenierías)
+
+                <!-- Tab Ingenierías EF -->
+                <a href="{{ route('exams.show', ['exam' => $exam, 'group' => 'EF', 'career' => request('career'), 'search' => request('search')]) }}" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request('group') === 'EF' ? 'bg-cyan-600 text-white shadow-md shadow-cyan-500/20' : 'bg-slate-800/70 text-cyan-400 hover:text-cyan-200 hover:bg-slate-800' }}">
+                    <i class="fa-solid fa-compass-drafting"></i>
+                    <span>Ingenierías (EF)</span>
+                    <span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] {{ request('group') === 'EF' ? 'bg-white/20 text-white' : 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' }}">{{ $groupsCount['EF'] }}</span>
                 </a>
             </div>
 
@@ -175,108 +203,166 @@
             </div>
         @else
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-slate-900/95 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
                         <tr>
-                            <th class="py-3 px-4 text-center">Pto. Gen.</th>
-                            <th class="py-3 px-4 text-center">Pto. Carr.</th>
-                            <th class="py-3 px-4">DNI</th>
-                            <th class="py-3 px-4">Postulante</th>
-                            <th class="py-3 px-4">Carrera</th>
-                            <th class="py-3 px-4 text-center">Grupo</th>
-                            <th class="py-3 px-4 text-center" title="Respuestas Correctas">Buenas</th>
-                            <th class="py-3 px-4 text-center" title="Respuestas Incorrectas">Malas</th>
-                            <th class="py-3 px-4 text-center" title="Respuestas en Blanco">Blanco</th>
-                            <th class="py-3 px-4 text-right">Puntaje Total</th>
-                            <th class="py-3 px-4 text-center">Acción</th>
+                            @if(request('group') && request('group') !== 'all')
+                                <th class="py-3 px-3 text-center whitespace-nowrap text-amber-300 font-bold">Pto. Grupo</th>
+                                <th class="py-3 px-2 text-center whitespace-nowrap">Pto. Gen.</th>
+                                <th class="py-3 px-2 text-center whitespace-nowrap">Pto. Carr.</th>
+                            @else
+                                <th class="py-3 px-3 text-center whitespace-nowrap text-amber-300 font-bold">Pto. Gen.</th>
+                                <th class="py-3 px-2 text-center whitespace-nowrap">Pto. Carr.</th>
+                                <th class="py-3 px-2 text-center whitespace-nowrap">Pto. Grupo</th>
+                            @endif
+
+                            <th class="py-3 px-3 whitespace-nowrap">DNI</th>
+                            <th class="py-3 px-4 whitespace-nowrap">Nombre y Apellido</th>
+                            <th class="py-3 px-4 whitespace-nowrap">Carrera</th>
+                            <th class="py-3 px-3 text-center whitespace-nowrap">Grupo</th>
+
+                            <!-- Asignaturas UNPRG -->
+                            @foreach($subjectColumns ?? \App\Services\ScoringService::SUBJECT_COLUMNS as $code => $col)
+                                <th class="py-2.5 px-2 text-center text-[10px] font-bold bg-emerald-950/30 text-emerald-300 border-l border-slate-800/80 whitespace-nowrap" title="{{ $col['name'] }}">
+                                    {{ $code }}
+                                </th>
+                            @endforeach
+
+                            <th class="py-3 px-2 text-center whitespace-nowrap border-l border-slate-800/80" title="Respuestas Correctas">
+                                <span class="text-emerald-400 font-bold">☑</span>
+                            </th>
+                            <th class="py-3 px-2 text-center whitespace-nowrap border-l border-slate-800/80" title="Respuestas Incorrectas">
+                                <span class="text-rose-400 font-bold">☒</span>
+                            </th>
+                            <th class="py-3 px-2 text-center whitespace-nowrap border-l border-slate-800/80" title="Respuestas en Blanco">
+                                <span class="text-slate-400 font-semibold text-[10px]">Blanco</span>
+                            </th>
+                            <th class="py-3 px-3 text-right whitespace-nowrap border-l border-slate-800/80 text-amber-300 font-bold">
+                                PUNTS
+                            </th>
+                            <th class="py-3 px-3 text-center whitespace-nowrap border-l border-slate-800/80">Acción</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">
                         @foreach($results as $res)
+                            @php
+                                $subScores = $res->subject_scores;
+                                $isGroupTab = request('group') && request('group') !== 'all';
+                                $primaryRank = $isGroupTab ? $res->group_rank : $res->general_rank;
+                            @endphp
                             <tr class="hover:bg-slate-800/40 transition-colors group">
-                                <!-- Puesto General -->
-                                <td class="py-3 px-4 text-center whitespace-nowrap">
-                                    @if($res->general_rank === 1)
-                                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs">🥇 1</span>
-                                    @elseif($res->general_rank === 2)
-                                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300/20 border border-slate-300/40 text-slate-200 font-bold text-xs">🥈 2</span>
-                                    @elseif($res->general_rank === 3)
-                                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 border border-amber-700/40 text-amber-400 font-bold text-xs">🥉 3</span>
+                                <!-- Puesto Principal (Pto. Grupo en pestaña de grupo, Pto. Gen en tabla general) -->
+                                <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                                    @if($primaryRank === 1)
+                                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[11px]">🥇 1</span>
+                                    @elseif($primaryRank === 2)
+                                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-300/20 border border-slate-300/40 text-slate-200 font-bold text-[11px]">🥈 2</span>
+                                    @elseif($primaryRank === 3)
+                                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700/20 border border-amber-700/40 text-amber-400 font-bold text-[11px]">🥉 3</span>
                                     @else
-                                        <span class="font-bold text-slate-400">{{ $res->general_rank }}°</span>
+                                        <span class="font-bold text-slate-300 text-xs">{{ $primaryRank }}°</span>
                                     @endif
                                 </td>
 
-                                <!-- Puesto Carrera -->
-                                <td class="py-3 px-4 text-center whitespace-nowrap">
-                                    <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold text-[11px] border border-slate-700">
-                                        {{ $res->career_rank }}°
-                                    </span>
-                                </td>
+                                @if($isGroupTab)
+                                    <!-- Pto. Gen secundario -->
+                                    <td class="py-2.5 px-2 text-center whitespace-nowrap">
+                                        <span class="text-xs text-slate-400 font-mono">{{ $res->general_rank }}°</span>
+                                    </td>
+                                    <!-- Pto. Carrera -->
+                                    <td class="py-2.5 px-2 text-center whitespace-nowrap">
+                                        <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold text-[11px] border border-slate-700">
+                                            {{ $res->career_rank }}°
+                                        </span>
+                                    </td>
+                                @else
+                                    <!-- Pto. Carrera -->
+                                    <td class="py-2.5 px-2 text-center whitespace-nowrap">
+                                        <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold text-[11px] border border-slate-700">
+                                            {{ $res->career_rank }}°
+                                        </span>
+                                    </td>
+                                    <!-- Pto. Grupo -->
+                                    <td class="py-2.5 px-2 text-center whitespace-nowrap">
+                                        <span class="text-xs text-slate-400 font-mono">{{ $res->group_rank }}°</span>
+                                    </td>
+                                @endif
 
                                 <!-- DNI -->
-                                <td class="py-3 px-4 font-mono text-slate-300 whitespace-nowrap">
+                                <td class="py-2.5 px-3 font-mono text-slate-300 text-xs whitespace-nowrap">
                                     {{ $res->dni ?: '-' }}
                                 </td>
 
                                 <!-- Nombre Completo -->
-                                <td class="py-3 px-4 whitespace-nowrap">
+                                <td class="py-2.5 px-4 whitespace-nowrap">
                                     <div class="font-bold text-white group-hover:text-indigo-400 transition-colors">
                                         {{ $res->full_name }}
                                     </div>
                                     @if($res->email)
-                                        <span class="text-[11px] text-slate-500 block">{{ $res->email }}</span>
+                                        <span class="text-[10px] text-slate-500 block truncate max-w-[180px]">{{ $res->email }}</span>
                                     @endif
                                 </td>
 
                                 <!-- Carrera -->
-                                <td class="py-3 px-4 whitespace-nowrap">
+                                <td class="py-2.5 px-4 whitespace-nowrap">
                                     <span class="text-slate-200 font-medium">{{ $res->career }}</span>
                                 </td>
 
                                 <!-- Grupo Académico -->
-                                <td class="py-3 px-4 text-center whitespace-nowrap">
+                                <td class="py-2.5 px-3 text-center whitespace-nowrap">
                                     @if($res->academic_group === 'A')
-                                        <span class="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold text-[11px]">Biomédicas (A)</span>
+                                        <span class="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold text-[10px]">Biomédicas (A)</span>
                                     @elseif($res->academic_group === 'BCD')
-                                        <span class="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold text-[11px]">Letras (BCD)</span>
+                                        <span class="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold text-[10px]">Letras (BCD)</span>
+                                    @elseif($res->academic_group === 'EF')
+                                        <span class="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold text-[10px]">Ingenierías (EF)</span>
                                     @else
-                                        <span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold text-[11px]">Ingenierías (EF)</span>
+                                        <span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-semibold text-[10px]">{{ $res->academic_group }}</span>
                                     @endif
                                 </td>
 
+                                <!-- Asignaturas UNPRG (HV, HM, ARIT, etc.) -->
+                                @foreach($subjectColumns ?? \App\Services\ScoringService::SUBJECT_COLUMNS as $code => $col)
+                                    @php
+                                        $val = $subScores[$code] ?? 0.0;
+                                    @endphp
+                                    <td class="py-2.5 px-2 text-right font-mono text-[11px] whitespace-nowrap border-l border-slate-800/40 {{ $val > 0 ? 'text-slate-200 font-medium' : ($val < 0 ? 'text-rose-400 font-bold' : 'text-slate-500') }}">
+                                        {{ number_format($val, 4) }}
+                                    </td>
+                                @endforeach
+
                                 <!-- Buenas -->
-                                <td class="py-3 px-4 text-center whitespace-nowrap">
-                                    <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                                <td class="py-2.5 px-2 text-center whitespace-nowrap border-l border-slate-800/40">
+                                    <span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold text-[11px]">
                                         {{ $res->correct_count }}
                                     </span>
                                 </td>
 
                                 <!-- Malas -->
-                                <td class="py-3 px-4 text-center whitespace-nowrap">
-                                    <span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
+                                <td class="py-2.5 px-2 text-center whitespace-nowrap border-l border-slate-800/40">
+                                    <span class="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold text-[11px]">
                                         {{ $res->incorrect_count }}
                                     </span>
                                 </td>
 
                                 <!-- Blanco -->
-                                <td class="py-3 px-4 text-center whitespace-nowrap">
-                                    <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-bold">
+                                <td class="py-2.5 px-2 text-center whitespace-nowrap border-l border-slate-800/40">
+                                    <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-bold text-[11px]">
                                         {{ $res->blank_count }}
                                     </span>
                                 </td>
 
                                 <!-- Puntaje Total -->
-                                <td class="py-3 px-4 text-right whitespace-nowrap">
-                                    <span class="text-sm font-extrabold text-white bg-gradient-to-r from-emerald-400 to-cyan-300 bg-clip-text text-transparent">
+                                <td class="py-2.5 px-3 text-right whitespace-nowrap border-l border-slate-800/40">
+                                    <span class="text-xs font-extrabold {{ $res->total_score < 0 ? 'text-rose-400 font-bold' : 'text-white bg-gradient-to-r from-emerald-400 to-cyan-300 bg-clip-text text-transparent' }}">
                                         {{ number_format($res->total_score, 4) }}
                                     </span>
                                 </td>
 
                                 <!-- Acción: Ver Desglose -->
-                                <td class="py-3 px-4 text-center whitespace-nowrap">
-                                    <button onclick="openStudentModal({{ $res->id }})" class="px-2.5 py-1 text-[11px] font-semibold text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-600 rounded-lg border border-indigo-500/20 transition-all flex items-center gap-1.5 mx-auto">
-                                        <i class="fa-solid fa-list-check"></i>
+                                <td class="py-2.5 px-3 text-center whitespace-nowrap border-l border-slate-800/40">
+                                    <button onclick="openStudentModal({{ $res->id }})" class="px-2 py-1 text-[11px] font-semibold text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-600 rounded-lg border border-indigo-500/20 transition-all inline-flex items-center gap-1">
+                                        <i class="fa-solid fa-list-check text-[10px]"></i>
                                         <span>Examen</span>
                                     </button>
                                 </td>
@@ -288,8 +374,8 @@
 
             <!-- Pagination -->
             @if($results->hasPages())
-                <div class="p-4 border-t border-slate-800">
-                    {{ $results->links() }}
+                <div class="p-4 border-t border-slate-800 bg-slate-900/40">
+                    {{ $results->links('vendor.pagination.tailwind') }}
                 </div>
             @endif
         @endif
@@ -297,16 +383,16 @@
 </div>
 
 <!-- MODAL: Subir Archivo de Respuestas -->
-<div id="modal-upload-responses" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
-        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+<div id="modal-upload-responses" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[92vh] flex flex-col animate-scale-up">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 flex-shrink-0">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
                     <i class="fa-solid fa-file-excel"></i>
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-white">Importar Respuestas de Alumnos</h3>
-                    <p class="text-xs text-slate-400">Sube el archivo Excel exportado de Google Forms o similar</p>
+                    <p class="text-xs text-slate-400">Puedes subir los 3 archivos a la vez o uno por uno</p>
                 </div>
             </div>
             <button type="button" onclick="document.getElementById('modal-upload-responses').classList.add('hidden')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
@@ -314,42 +400,94 @@
             </button>
         </div>
 
-        <form action="{{ route('exams.upload-responses', $exam) }}" method="POST" enctype="multipart/form-data" class="mt-5 space-y-4">
-            @csrf
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Archivo Excel (.xlsx, .xls)</label>
-                <div class="relative border-2 border-dashed border-slate-700 hover:border-emerald-500/60 rounded-xl p-6 text-center bg-slate-950/50 transition-colors">
-                    <input type="file" name="responses_file" accept=".xlsx,.xls,.csv" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                    <div class="space-y-2">
-                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-emerald-400"></i>
-                        <p class="text-xs text-slate-300 font-medium">Haz clic o arrastra aquí el archivo Excel de respuestas</p>
-                        <p class="text-[11px] text-slate-500">Ej: SIMULACRO 7° (LETRAS) (respuestas).xlsx</p>
+        <div class="mt-4 overflow-y-auto flex-1 pr-1 space-y-4">
+            <!-- Opción 1: Subir los 3 grupos a la vez (Lote) -->
+            <form action="{{ route('exams.upload-responses', $exam) }}" method="POST" enctype="multipart/form-data" class="p-4 rounded-xl bg-slate-950/60 border border-emerald-500/20 space-y-3">
+                @csrf
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-bolt"></i>
+                        <span>Opción A: Subir los 3 Archivos de Respuestas a la vez</span>
+                    </span>
+                    <span class="text-[10px] text-slate-400">Recomendado</span>
+                </div>
+
+                <div class="space-y-2 text-xs">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-rose-400 mb-1">1. Respuestas Grupo A (Biomédicas)</label>
+                        <input type="file" name="responses_file_a" accept=".xlsx,.xls,.csv" class="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-rose-500/20 file:text-rose-300 hover:file:bg-rose-500/30">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-amber-400 mb-1">2. Respuestas Grupo BCD (Letras)</label>
+                        <input type="file" name="responses_file_bcd" accept=".xlsx,.xls,.csv" class="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-cyan-400 mb-1">3. Respuestas Grupo EF (Ingenierías)</label>
+                        <input type="file" name="responses_file_ef" accept=".xlsx,.xls,.csv" class="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-500/20 file:text-cyan-300 hover:file:bg-cyan-500/30">
                     </div>
                 </div>
-            </div>
 
-            <div class="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
-                <button type="button" onclick="document.getElementById('modal-upload-responses').classList.add('hidden')" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">Cancelar</button>
-                <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
-                    <i class="fa-solid fa-upload"></i>
-                    <span>Procesar y Calificar</span>
-                </button>
-            </div>
-        </form>
+                <div class="pt-2 text-right">
+                    <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20 transition-all inline-flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>Procesar los 3 Grupos a la Vez</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Opción 2: Subir un solo archivo individual -->
+            <form action="{{ route('exams.upload-responses', $exam) }}" method="POST" enctype="multipart/form-data" class="p-4 rounded-xl bg-slate-950/40 border border-slate-800 space-y-3">
+                @csrf
+                <div class="border-b border-slate-800 pb-2">
+                    <span class="text-xs font-bold text-slate-300">Opción B: Subir solo 1 grupo específico</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <label class="flex flex-col items-center p-2 rounded-xl border border-slate-700 bg-slate-900 cursor-pointer has-[:checked]:border-rose-500 has-[:checked]:bg-rose-500/10 text-center">
+                        <input type="radio" name="academic_group" value="A" class="sr-only" checked>
+                        <span class="text-xs font-bold text-rose-400">Biomédicas (A)</span>
+                    </label>
+                    <label class="flex flex-col items-center p-2 rounded-xl border border-slate-700 bg-slate-900 cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/10 text-center">
+                        <input type="radio" name="academic_group" value="BCD" class="sr-only">
+                        <span class="text-xs font-bold text-amber-400">Letras (BCD)</span>
+                    </label>
+                    <label class="flex flex-col items-center p-2 rounded-xl border border-slate-700 bg-slate-900 cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-500/10 text-center">
+                        <input type="radio" name="academic_group" value="EF" class="sr-only">
+                        <span class="text-xs font-bold text-cyan-400">Ingenierías (EF)</span>
+                    </label>
+                </div>
+
+                <div>
+                    <input type="file" name="responses_file" accept=".xlsx,.xls,.csv" required class="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-white hover:file:bg-slate-700">
+                </div>
+
+                <div class="pt-1 text-right">
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-all inline-flex items-center gap-1.5">
+                        <i class="fa-solid fa-upload"></i>
+                        <span>Procesar Este Grupo</span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
 <!-- MODAL: Ver / Subir Claves Oficiales -->
 <div id="modal-keys" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl relative max-h-[90vh] flex flex-col">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full p-6 shadow-2xl relative max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between pb-4 border-b border-slate-800 flex-shrink-0">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                     <i class="fa-solid fa-key"></i>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-white">Claves Oficiales del Simulacro</h3>
-                    <p class="text-xs text-slate-400">{{ $answerKeys->count() }} claves registradas</p>
+                    <h3 class="text-base font-bold text-white">Claves Oficiales por Grupo Académico</h3>
+                    <p class="text-xs text-slate-400">
+                        Total registradas:
+                        <strong class="text-rose-400">A: {{ $keysByGroup['A'] }}</strong> |
+                        <strong class="text-amber-400">BCD: {{ $keysByGroup['BCD'] }}</strong> |
+                        <strong class="text-cyan-400">EF: {{ $keysByGroup['EF'] }}</strong>
+                    </p>
                 </div>
             </div>
             <button type="button" onclick="document.getElementById('modal-keys').classList.add('hidden')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
@@ -357,32 +495,65 @@
             </button>
         </div>
 
-        <!-- Formulario para subir / actualizar archivo de claves -->
-        <div class="my-4 p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex-shrink-0">
-            <form action="{{ route('exams.upload-keys', $exam) }}" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row items-center gap-3">
+        <!-- Formulario para subir claves (en lote o individual) -->
+        <div class="my-4 p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex-shrink-0 space-y-3">
+            <!-- Subir en Lote los 3 archivos de claves -->
+            <form action="{{ route('exams.upload-keys', $exam) }}" method="POST" enctype="multipart/form-data" class="space-y-3">
                 @csrf
-                <div class="flex-1 w-full">
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Cargar/Actualizar Excel de Claves (.xlsx)</label>
-                    <input type="file" name="keys_file" accept=".xlsx,.xls,.csv" required class="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                    <span class="text-xs font-bold text-amber-400">Subir Claves de los 3 Grupos a la Vez (o individual)</span>
                 </div>
-                <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg shadow-md shadow-amber-500/20 transition-all flex items-center gap-2 flex-shrink-0">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <span>Subir Claves</span>
-                </button>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-rose-400 mb-1">Claves Biomédicas (A)</label>
+                        <input type="file" name="keys_file_a" accept=".xlsx,.xls,.csv" class="w-full text-[11px] text-slate-300 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:bg-rose-500/20 file:text-rose-300 hover:file:bg-rose-500/30">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-amber-400 mb-1">Claves Letras (BCD)</label>
+                        <input type="file" name="keys_file_bcd" accept=".xlsx,.xls,.csv" class="w-full text-[11px] text-slate-300 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-cyan-400 mb-1">Claves Ingenierías (EF)</label>
+                        <input type="file" name="keys_file_ef" accept=".xlsx,.xls,.csv" class="w-full text-[11px] text-slate-300 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:bg-cyan-500/20 file:text-cyan-300 hover:file:bg-cyan-500/30">
+                    </div>
+                </div>
+                <div class="text-right pt-1">
+                    <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg shadow-md shadow-amber-500/20 transition-all inline-flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>Guardar Claves Seleccionadas</span>
+                    </button>
+                </div>
             </form>
+        </div>
+
+        <!-- Pestañas de filtrado de claves en modal -->
+        <div class="flex items-center gap-2 mb-3 flex-shrink-0" id="keys-tab-bar">
+            <button type="button" onclick="filterKeysTable('ALL')" id="key-tab-ALL" class="px-3 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white transition-all">
+                Todas ({{ $answerKeys->count() }})
+            </button>
+            <button type="button" onclick="filterKeysTable('A')" id="key-tab-A" class="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-rose-400 hover:bg-slate-700 transition-all">
+                Biomédicas A ({{ $keysByGroup['A'] }})
+            </button>
+            <button type="button" onclick="filterKeysTable('BCD')" id="key-tab-BCD" class="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-amber-400 hover:bg-slate-700 transition-all">
+                Letras BCD ({{ $keysByGroup['BCD'] }})
+            </button>
+            <button type="button" onclick="filterKeysTable('EF')" id="key-tab-EF" class="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-cyan-400 hover:bg-slate-700 transition-all">
+                Ingenierías EF ({{ $keysByGroup['EF'] }})
+            </button>
         </div>
 
         <!-- Lista de Claves Registradas -->
         <div class="overflow-y-auto flex-1 divide-y divide-slate-800 border border-slate-800 rounded-xl">
             @if($answerKeys->isEmpty())
                 <div class="p-8 text-center text-xs text-slate-400">
-                    No se han registrado claves oficiales todavía. Sube el archivo Excel de claves arriba.
+                    No se han registrado claves oficiales todavía. Sube los archivos Excel de claves por grupo arriba.
                 </div>
             @else
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs" id="table-keys-list">
                     <thead class="bg-slate-950 text-slate-400 sticky top-0 border-b border-slate-800">
                         <tr>
-                            <th class="py-2.5 px-3 text-center w-16">N°</th>
+                            <th class="py-2.5 px-3 text-center w-14">N°</th>
+                            <th class="py-2.5 px-3 text-center w-24">Grupo</th>
                             <th class="py-2.5 px-3">Asignatura / Área</th>
                             <th class="py-2.5 px-3 text-center w-20">Clave</th>
                             <th class="py-2.5 px-3">Justificación / Detalle</th>
@@ -390,8 +561,19 @@
                     </thead>
                     <tbody class="divide-y divide-slate-800/60 bg-slate-900/50">
                         @foreach($answerKeys as $key)
-                            <tr class="hover:bg-slate-800/40">
+                            <tr class="hover:bg-slate-800/40 key-row" data-group="{{ $key->academic_group }}">
                                 <td class="py-2 px-3 text-center font-bold text-slate-300">{{ $key->question_number }}</td>
+                                <td class="py-2 px-3 text-center whitespace-nowrap">
+                                    @if($key->academic_group === 'A')
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">A</span>
+                                    @elseif($key->academic_group === 'BCD')
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">BCD</span>
+                                    @elseif($key->academic_group === 'EF')
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">EF</span>
+                                    @else
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">Gen</span>
+                                    @endif
+                                </td>
                                 <td class="py-2 px-3 text-slate-300">{{ $key->subject ?: 'General' }}</td>
                                 <td class="py-2 px-3 text-center">
                                     <span class="inline-block w-6 h-6 leading-6 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold">
@@ -464,11 +646,11 @@
         const nameEl = document.getElementById('modal-student-name');
         const subEl = document.getElementById('modal-student-subtitle');
         const grid = document.getElementById('modal-questions-grid');
-        
+
         nameEl.innerText = 'Cargando...';
         subEl.innerText = 'Por favor espere';
         grid.innerHTML = '<div class="col-span-full py-8 text-center text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando detalle del examen...</div>';
-        
+
         modal.classList.remove('hidden');
 
         try {
@@ -480,7 +662,10 @@
             nameEl.innerText = student.full_name;
             subEl.innerText = `DNI: ${student.dni || '-'} | Carrera: ${student.career} | Grupo: ${student.group_label || student.academic_group} | Puesto Gen: ${student.general_rank}°`;
 
-            document.getElementById('metric-total-score').innerText = parseFloat(student.total_score).toFixed(4);
+            const totalScoreVal = parseFloat(student.total_score);
+            const totalScoreEl = document.getElementById('metric-total-score');
+            totalScoreEl.innerText = totalScoreVal.toFixed(4);
+            totalScoreEl.className = totalScoreVal < 0 ? 'text-lg font-extrabold text-rose-400' : 'text-lg font-extrabold text-white';
             document.getElementById('metric-correct').innerText = student.correct_count;
             document.getElementById('metric-incorrect').innerText = student.incorrect_count;
             document.getElementById('metric-blank').innerText = student.blank_count;
@@ -491,7 +676,7 @@
             keys.forEach(qNum => {
                 const item = details[qNum];
                 const card = document.createElement('div');
-                
+
                 let borderClass = 'border-slate-800 bg-slate-950/40 text-slate-400';
                 let icon = '<i class="fa-solid fa-minus text-slate-500"></i>';
                 let badgeColor = 'bg-slate-800 text-slate-400';
@@ -528,5 +713,48 @@
             grid.innerHTML = '<div class="col-span-full py-8 text-center text-xs text-rose-400">Error al cargar el detalle del alumno.</div>';
         }
     }
+
+    function filterKeysTable(group) {
+        const rows = document.querySelectorAll('.key-row');
+        rows.forEach(row => {
+            const rowGroup = row.getAttribute('data-group');
+            if (group === 'ALL' || rowGroup === group || rowGroup === 'ALL') {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Update active tab buttons
+        ['ALL', 'A', 'BCD', 'EF'].forEach(g => {
+            const btn = document.getElementById(`key-tab-${g}`);
+            if (!btn) return;
+            if (g === group) {
+                btn.className = 'px-3 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white transition-all';
+            } else {
+                let textCol = 'text-slate-300';
+                if (g === 'A') textCol = 'text-rose-400';
+                if (g === 'BCD') textCol = 'text-amber-400';
+                if (g === 'EF') textCol = 'text-cyan-400';
+                btn.className = `px-3 py-1 text-xs font-semibold rounded-lg bg-slate-800 ${textCol} hover:bg-slate-700 transition-all`;
+            }
+        });
+    }
+
+    function toggleExportMenu() {
+        const menu = document.getElementById('export-dropdown-menu');
+        if (menu) {
+            menu.classList.toggle('hidden');
+        }
+    }
+
+    // Cerrar dropdown si se hace click fuera
+    window.addEventListener('click', function(e) {
+        const wrapper = document.getElementById('export-dropdown-wrapper');
+        const menu = document.getElementById('export-dropdown-menu');
+        if (wrapper && menu && !wrapper.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
 </script>
 @endsection

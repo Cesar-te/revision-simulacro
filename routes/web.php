@@ -17,5 +17,6 @@ Route::prefix('exams')->name('exams.')->group(function () {
     Route::post('/{exam}/upload-responses', [ExamController::class, 'uploadResponses'])->name('upload-responses');
     Route::post('/{exam}/recalculate', [ExamController::class, 'recalculateAll'])->name('recalculate');
     Route::get('/{exam}/export', [ExamController::class, 'export'])->name('export');
+    Route::get('/{exam}/export-pdf', [ExamController::class, 'exportPdf'])->name('export-pdf');
     Route::get('/{exam}/student/{student}', [ExamController::class, 'studentDetail'])->name('student-detail');
 });

@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('exam_answer_keys', function (Blueprint $table) {
             $table->id();
             $table->foreignId('exam_id')->constrained('exams')->cascadeOnDelete();
+            $table->string('academic_group', 10)->default('ALL')->index();
             $table->integer('question_number');
             $table->string('subject')->nullable(); // e.g. Habilidad Verbal, Habilidad Matemática, etc.
             $table->string('correct_key', 5); // 'A', 'B', 'C', 'D', 'E', or '*'
@@ -21,7 +22,7 @@ return new class extends Migration
             $table->boolean('is_annulled')->default(false); // Si la pregunta es anulada
             $table->timestamps();
 
-            $table->unique(['exam_id', 'question_number']);
+            $table->unique(['exam_id', 'academic_group', 'question_number'], 'exam_group_question_unique');
         });
     }
 

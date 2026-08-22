@@ -38,6 +38,92 @@ class ScoringService
     ];
 
     /**
+     * Lista y mapeo de columnas de asignaturas UNPRG
+     */
+    public const SUBJECT_COLUMNS = [
+        'HV'   => ['name' => 'Habilidad Verbal', 'short' => 'HV'],
+        'HM'   => ['name' => 'Habilidad Matemática', 'short' => 'HM'],
+        'ARIT' => ['name' => 'Aritmética', 'short' => 'ARIT'],
+        'GEOM' => ['name' => 'Geometría', 'short' => 'GEOM'],
+        'ALG'  => ['name' => 'Álgebra', 'short' => 'ALG'],
+        'TRIG' => ['name' => 'Trigonometría', 'short' => 'TRIG'],
+        'LENG' => ['name' => 'Lenguaje', 'short' => 'LENG'],
+        'LIT'  => ['name' => 'Literatura', 'short' => 'LIT'],
+        'PSIC' => ['name' => 'Psicología', 'short' => 'PSIC'],
+        'CIV'  => ['name' => 'Educación Cívica', 'short' => 'CIV'],
+        'HIST' => ['name' => 'Historia', 'short' => 'HIST'],
+        'GEOG' => ['name' => 'Geografía', 'short' => 'GEOG'],
+        'ECON' => ['name' => 'Economía', 'short' => 'ECON'],
+        'FILO' => ['name' => 'Filosofía', 'short' => 'FILO'],
+        'FIS'  => ['name' => 'Física', 'short' => 'FIS'],
+        'QUI'  => ['name' => 'Química', 'short' => 'QUI'],
+        'BIO'  => ['name' => 'Biología', 'short' => 'BIO'],
+    ];
+
+    /**
+     * Mapea el nombre de una materia/asignatura a su código de columna (HV, HM, ARIT, etc.)
+     */
+    public function getSubjectCode(string $subject): string
+    {
+        $sub = mb_strtoupper(trim($subject), 'UTF-8');
+        $clean = strtr($sub, ['Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ñ' => 'N']);
+
+        if (str_contains($clean, 'VERBAL') || str_contains($clean, 'R.V.') || str_ends_with($clean, ' RV') || $clean === 'RV' || $clean === 'HV') {
+            return 'HV';
+        }
+        if (str_contains($clean, 'HABILIDAD MATEMATICA') || str_contains($clean, 'RAZONAMIENTO MATEMATICO') || str_contains($clean, 'R.M.') || str_ends_with($clean, ' RM') || $clean === 'RM' || $clean === 'HM') {
+            return 'HM';
+        }
+        if (str_contains($clean, 'ARITMETICA') || $clean === 'ARIT') {
+            return 'ARIT';
+        }
+        if (str_contains($clean, 'GEOMETRIA') || $clean === 'GEOM') {
+            return 'GEOM';
+        }
+        if (str_contains($clean, 'ALGEBRA') || $clean === 'ALG') {
+            return 'ALG';
+        }
+        if (str_contains($clean, 'TRIGONOMETRIA') || $clean === 'TRIG') {
+            return 'TRIG';
+        }
+        if (str_contains($clean, 'LENGUAJE') || str_contains($clean, 'COMUNICACION') || str_contains($clean, 'LENGUA') || $clean === 'LENG') {
+            return 'LENG';
+        }
+        if (str_contains($clean, 'LITERATURA') || $clean === 'LIT') {
+            return 'LIT';
+        }
+        if (str_contains($clean, 'PSICOLOGIA') || $clean === 'PSIC') {
+            return 'PSIC';
+        }
+        if (str_contains($clean, 'CIVICA') || str_contains($clean, 'CIVICO') || $clean === 'CIV') {
+            return 'CIV';
+        }
+        if (str_contains($clean, 'HISTORIA') || $clean === 'HIST') {
+            return 'HIST';
+        }
+        if (str_contains($clean, 'GEOGRAFIA') || $clean === 'GEOG') {
+            return 'GEOG';
+        }
+        if (str_contains($clean, 'ECONOMIA') || $clean === 'ECON') {
+            return 'ECON';
+        }
+        if (str_contains($clean, 'FILOSOFIA') || $clean === 'FILO') {
+            return 'FILO';
+        }
+        if (str_contains($clean, 'FISICA') || $clean === 'FIS') {
+            return 'FIS';
+        }
+        if (str_contains($clean, 'QUIMICA') || $clean === 'QUI') {
+            return 'QUI';
+        }
+        if (str_contains($clean, 'BIOLOGIA') || str_contains($clean, 'ANATOMIA') || str_contains($clean, 'BOTANICA') || $clean === 'BIO') {
+            return 'BIO';
+        }
+
+        return 'HV';
+    }
+
+    /**
      * Mapea el nombre de una materia/asignatura a su categoría/bloque
      */
     public function getSubjectCategory(string $subject): string
@@ -131,14 +217,36 @@ class ScoringService
     }
 
     /**
+     * Obtiene las claves del examen correspondientes al grupo académico del estudiante
+     */
+    public function getAnswerKeysForGroup(Exam $exam, string $groupCode): Collection
+    {
+        $keys = $exam->answerKeys()->where('academic_group', $groupCode)->get();
+        if ($keys->isEmpty()) {
+            $keys = $exam->answerKeys()->where('academic_group', 'ALL')->get();
+        }
+        if ($keys->isEmpty()) {
+            $keys = $exam->answerKeys()->get();
+        }
+        return $keys->keyBy('question_number');
+    }
+
+    /**
      * Califica las respuestas de un estudiante contra las claves del examen
      */
-    public function scoreStudent(Exam $exam, array $studentAnswers, string $careerName): array
+    public function scoreStudent(Exam $exam, array $studentAnswers, string $careerName, ?string $forcedGroup = null): array
     {
         $groupInfo = $this->getGroupForCareer($careerName);
-        $groupCode = $this->normalizeGroup($groupInfo['academic_group']);
+        $groupCode = $forcedGroup ? $this->normalizeGroup($forcedGroup) : $this->normalizeGroup($groupInfo['academic_group']);
 
-        $answerKeys = $exam->answerKeys->keyBy('question_number');
+        $groupLabel = match($groupCode) {
+            'A'     => 'Ciencias Médicas (Biomédicas)',
+            'BCD'   => 'Letras / Sociales y Económicas',
+            'EF'    => 'Ciencias e Ingenierías',
+            default => $groupInfo['group_label'] ?? 'General',
+        };
+
+        $answerKeys = $this->getAnswerKeysForGroup($exam, $groupCode);
         $penalty = (float) $exam->incorrect_penalty; // e.g. -1.1250
         if ($penalty > 0) {
             $penalty = -$penalty; // aseguramos que sea negativa
@@ -203,7 +311,7 @@ class ScoringService
             'correct_count'      => $correctCount,
             'incorrect_count'    => $incorrectCount,
             'blank_count'        => $blankCount,
-            'total_score'        => round(max(0, $totalScore), 4), // el puntaje total mínimo es 0
+            'total_score'        => round($totalScore, 4), // Permite puntajes negativos
             'raw_total_score'    => round($totalScore, 4),
             'scores_detail_json' => $scoresDetail,
         ];

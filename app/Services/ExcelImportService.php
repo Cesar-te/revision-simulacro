@@ -19,9 +19,9 @@ class ExcelImportService
     }
 
     /**
-     * Importa las claves oficiales desde un archivo Excel
+     * Importa las claves oficiales desde un archivo Excel para un grupo académico específico o general
      */
-    public function importAnswerKeys(Exam $exam, string $filePath): array
+    public function importAnswerKeys(Exam $exam, string $filePath, string $academicGroup = 'ALL'): array
     {
         $spreadsheet = IOFactory::load($filePath);
         $sheet = $spreadsheet->getSheetByName('Respuestas') 
@@ -69,6 +69,7 @@ class ExcelImportService
 
         $importedCount = 0;
         $maxQuestionNum = 0;
+        $cleanGroup = strtoupper(trim($academicGroup ?: 'ALL'));
 
         foreach ($rows as $rIdx => $row) {
             if ($rIdx <= $headerRowIndex) continue;
@@ -90,7 +91,8 @@ class ExcelImportService
 
             ExamAnswerKey::updateOrCreate(
                 [
-                    'exam_id' => $exam->id,
+                    'exam_id'         => $exam->id,
+                    'academic_group'  => $cleanGroup,
                     'question_number' => $qNum,
                 ],
                 [
@@ -113,16 +115,17 @@ class ExcelImportService
         }
 
         return [
-            'success' => true,
-            'imported_keys' => $importedCount,
-            'max_question' => $maxQuestionNum,
+            'success'        => true,
+            'imported_keys'  => $importedCount,
+            'max_question'   => $maxQuestionNum,
+            'academic_group' => $cleanGroup,
         ];
     }
 
     /**
      * Importa las respuestas de los estudiantes desde el Excel (Google Forms / Formato simulacro)
      */
-    public function importStudentResponses(Exam $exam, string $filePath): array
+    public function importStudentResponses(Exam $exam, string $filePath, ?string $academicGroup = null): array
     {
         $spreadsheet = IOFactory::load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
@@ -219,8 +222,10 @@ class ExcelImportService
         $importedStudents = 0;
         $totalRows = count($rows);
 
-        // Limpiar resultados anteriores para evitar duplicados en re-importaciones
-        StudentResult::where('exam_id', $exam->id)->delete();
+        // Limpiar solo los resultados del grupo específico si se indicó, para no borrar a los otros grupos
+        if ($academicGroup) {
+            StudentResult::where('exam_id', $exam->id)->where('academic_group', $academicGroup)->delete();
+        }
 
         for ($rIdx = 2; $rIdx <= $totalRows; $rIdx++) {
             $row = $rows[$rIdx] ?? null;
@@ -249,8 +254,8 @@ class ExcelImportService
                 $studentAnswers[$qNum] = $cleanAns;
             }
 
-            // Calificar al estudiante usando ScoringService
-            $scoreData = $this->scoringService->scoreStudent($exam, $studentAnswers, $career ?: 'Sin Carrera');
+            // Calificar al estudiante usando ScoringService con el grupo respectivo si se especificó
+            $scoreData = $this->scoringService->scoreStudent($exam, $studentAnswers, $career ?: 'Sin Carrera', $academicGroup);
 
             $submittedAt = null;
             if ($timestampRaw) {
@@ -261,22 +266,26 @@ class ExcelImportService
                 }
             }
 
-            StudentResult::create([
-                'exam_id'            => $exam->id,
-                'dni'                => $dni ?: null,
-                'full_name'          => $fullName ?: 'Estudiante sin nombre',
-                'email'              => $email ?: null,
-                'career'             => $career ?: 'Sin Carrera',
-                'academic_group'     => $scoreData['academic_group'],
-                'group_label'        => $scoreData['group_label'],
-                'correct_count'      => $scoreData['correct_count'],
-                'incorrect_count'    => $scoreData['incorrect_count'],
-                'blank_count'        => $scoreData['blank_count'],
-                'total_score'        => $scoreData['total_score'],
-                'answers_json'       => $studentAnswers,
-                'scores_detail_json' => $scoreData['scores_detail_json'],
-                'submitted_at'       => $submittedAt,
-            ]);
+            StudentResult::updateOrCreate(
+                [
+                    'exam_id'   => $exam->id,
+                    'full_name' => $fullName ?: 'Estudiante sin nombre',
+                ],
+                [
+                    'dni'                => $dni ?: null,
+                    'email'              => $email ?: null,
+                    'career'             => $career ?: 'Sin Carrera',
+                    'academic_group'     => $scoreData['academic_group'],
+                    'group_label'        => $scoreData['group_label'],
+                    'correct_count'      => $scoreData['correct_count'],
+                    'incorrect_count'    => $scoreData['incorrect_count'],
+                    'blank_count'        => $scoreData['blank_count'],
+                    'total_score'        => $scoreData['total_score'],
+                    'answers_json'       => $studentAnswers,
+                    'scores_detail_json' => $scoreData['scores_detail_json'],
+                    'submitted_at'       => $submittedAt,
+                ]
+            );
 
             $importedStudents++;
         }
