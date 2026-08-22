@@ -91,17 +91,19 @@ Si no detecta columnas de preguntas, asume que empiezan desde la columna `G`.
 - Si coinciden examen, grupo, DNI y nombre, se actualiza la fila existente.
 - Si se fuerza un grupo al importar, ese grupo manda sobre la carrera detectada.
 - Cada simulacro conserva sus propias reglas de puntaje. Cambiar los puntajes de un simulacro no cambia los anteriores ni los futuros.
-- El puntaje no se normaliza: cada correcta suma el valor configurado por area/grupo, cada mala resta la penalidad plana y el blanco suma el puntaje en blanco. Si 100 buenas no suma `2000.0000`, revisa los valores en `Puntajes` o las areas de `Claves Oficiales`.
+- El puntaje no se normaliza: cada correcta suma el valor configurado por bloque/grupo, cada mala resta la penalidad plana y el blanco suma el puntaje en blanco. La distribucion de bloques depende del grupo academico.
 
 ## Cambiar puntajes por pregunta
 
-Dentro de un simulacro abre `Puntajes`, cambia los valores por pregunta por grupo y asignatura, y guarda. El sistema recalcula automaticamente los resultados existentes con esas nuevas reglas.
+Dentro de un simulacro abre `Puntajes`, cambia los valores por pregunta por grupo y bloque, y guarda. El sistema recalcula automaticamente los resultados existentes con esas nuevas reglas.
 
-Las asignaturas configurables son:
+Los bloques configurables son:
 
-- HV, HM, ARIT, GEOM, ALG, TRIG.
-- LENG, LIT, PSIC, CIV, HIST, GEOG, ECON, FILO.
-- FIS, QUI, BIO.
+- Habilidad verbal y matematica.
+- Ciencias basicas.
+- Letras y humanidades.
+- Fisica y quimica.
+- Biologia.
 
 ## Corregir una clave oficial
 

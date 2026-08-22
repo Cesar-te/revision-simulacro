@@ -38,72 +38,40 @@ class ScoringService
         ],
     ];
 
-    public const SUBJECT_WEIGHT_CONFIG = [
-        'A' => [ // Biomedicas
-            'HV' => 20.0000,
-            'HM' => 20.0000,
-            'ARIT' => 14.3014,
-            'GEOM' => 14.3014,
-            'ALG' => 14.3014,
-            'TRIG' => 14.3014,
-            'LENG' => 14.2770,
-            'LIT' => 14.2770,
-            'PSIC' => 14.2770,
-            'CIV' => 14.2770,
-            'HIST' => 14.2770,
-            'GEOG' => 14.2770,
-            'ECON' => 14.2770,
-            'FILO' => 14.2770,
-            'FIS' => 25.0000,
-            'QUI' => 25.0000,
-            'BIO' => 25.0000,
-        ],
-        'BCD' => [ // Letras / Humanidades / Economicas / Sociales
-            'HV' => 20.0000,
-            'HM' => 20.0000,
-            'ARIT' => 16.0012,
-            'GEOM' => 16.0012,
-            'ALG' => 16.0012,
-            'TRIG' => 16.0012,
-            'LENG' => 23.5290,
-            'LIT' => 23.5290,
-            'PSIC' => 23.5290,
-            'CIV' => 23.5290,
-            'HIST' => 23.5290,
-            'GEOG' => 23.5290,
-            'ECON' => 23.5290,
-            'FILO' => 23.5290,
-            'FIS' => 14.5450,
-            'QUI' => 14.5450,
-            'BIO' => 14.5450,
-        ],
-        'EF' => [ // Ingenierias / Agropecuarias
-            'HV' => 20.0000,
-            'HM' => 20.0000,
-            'ARIT' => 22.2220,
-            'GEOM' => 22.2220,
-            'ALG' => 22.2220,
-            'TRIG' => 22.2220,
-            'LENG' => 17.6310,
-            'LIT' => 17.6310,
-            'PSIC' => 17.6310,
-            'CIV' => 17.6310,
-            'HIST' => 17.6310,
-            'GEOG' => 17.6310,
-            'ECON' => 17.6310,
-            'FILO' => 17.6310,
-            'FIS' => 22.2220,
-            'QUI' => 22.2220,
-            'BIO' => 13.0038,
-        ],
-    ];
-
     public const CATEGORY_LABELS = [
         'VERBAL_MATE' => 'Habilidad verbal y matematica',
         'MATE_BASIC' => 'Ciencias basicas',
         'LETRAS' => 'Letras y humanidades',
         'FISICA_QUIM' => 'Fisica y quimica',
         'BIOLOGIA' => 'Biologia',
+    ];
+
+    /**
+     * Distribucion oficial de preguntas por grupo academico.
+     * El Excel de claves puede traer areas de referencia, pero el bloque de
+     * puntaje depende del grupo A, BCD o EF.
+     */
+    public const CATEGORY_QUESTION_DISTRIBUTIONS = [
+        'A' => [
+            'VERBAL_MATE' => 40,
+            'MATE_BASIC' => 10,
+            'LETRAS' => 18,
+            'FISICA_QUIM' => 14,
+            'BIOLOGIA' => 18,
+        ],
+        'BCD' => [
+            'VERBAL_MATE' => 40,
+            'LETRAS' => 34,
+            'MATE_BASIC' => 15,
+            'FISICA_QUIM' => 11,
+        ],
+        'EF' => [
+            'VERBAL_MATE' => 40,
+            'MATE_BASIC' => 24,
+            'LETRAS' => 19,
+            'FISICA_QUIM' => 12,
+            'BIOLOGIA' => 5,
+        ],
     ];
 
     public const GROUP_LABELS = [
@@ -203,23 +171,6 @@ class ScoringService
      */
     public function getSubjectCategory(string $subject): string
     {
-        $code = $this->getSubjectCode($subject);
-        if (in_array($code, ['HV', 'HM'], true)) {
-            return 'VERBAL_MATE';
-        }
-        if (in_array($code, ['ARIT', 'GEOM', 'ALG', 'TRIG'], true)) {
-            return 'MATE_BASIC';
-        }
-        if (in_array($code, ['LENG', 'LIT', 'PSIC', 'CIV', 'HIST', 'GEOG', 'ECON', 'FILO'], true)) {
-            return 'LETRAS';
-        }
-        if (in_array($code, ['FIS', 'QUI'], true)) {
-            return 'FISICA_QUIM';
-        }
-        if ($code === 'BIO') {
-            return 'BIOLOGIA';
-        }
-
         $sub = mb_strtoupper(trim($subject), 'UTF-8');
         $clean = strtr($sub, ['Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ñ' => 'N']);
 
@@ -251,30 +202,41 @@ class ScoringService
         return 'VERBAL_MATE';
     }
 
+    public function getCategoryForQuestion(string $group, int $questionNumber, string $subject): string
+    {
+        $groupKey = $this->normalizeGroup($group);
+        $distribution = self::CATEGORY_QUESTION_DISTRIBUTIONS[$groupKey] ?? null;
+
+        if (! $distribution || $questionNumber < 1) {
+            return $this->getSubjectCategory($subject);
+        }
+
+        $limit = 0;
+        foreach ($distribution as $category => $count) {
+            $limit += $count;
+            if ($questionNumber <= $limit) {
+                return $category;
+            }
+        }
+
+        return $this->getSubjectCategory($subject);
+    }
+
     /**
      * Retorna el puntaje de respuesta correcta según la materia y el grupo académico
      */
     public function ensureScoringRules(Exam $exam): void
     {
-        $existingRules = ExamScoringRule::where('exam_id', $exam->id)
-            ->get()
-            ->groupBy(fn (ExamScoringRule $rule) => $this->normalizeGroup($rule->academic_group));
-
-        foreach (self::SUBJECT_WEIGHT_CONFIG as $group => $subjects) {
-            $existingGroupRules = $existingRules->get($group, collect())->keyBy('category');
-
-            foreach ($subjects as $subjectCode => $points) {
-                $category = $this->getSubjectCategory($subjectCode);
-                $pointsFromExistingCategory = $existingGroupRules->get($category)?->points_correct;
-
+        foreach (self::WEIGHT_CONFIG as $group => $categories) {
+            foreach ($categories as $category => $points) {
                 ExamScoringRule::firstOrCreate(
                     [
                         'exam_id' => $exam->id,
                         'academic_group' => $group,
-                        'category' => $subjectCode,
+                        'category' => $category,
                     ],
                     [
-                        'points_correct' => $pointsFromExistingCategory ?? $points,
+                        'points_correct' => $points,
                     ]
                 );
             }
@@ -288,17 +250,16 @@ class ScoringService
     {
         $this->ensureScoringRules($exam);
 
-        $matrix = self::SUBJECT_WEIGHT_CONFIG;
+        $matrix = self::WEIGHT_CONFIG;
         $rules = ExamScoringRule::where('exam_id', $exam->id)->get();
 
         foreach ($rules as $rule) {
             $group = $this->normalizeGroup($rule->academic_group);
-            $subjectCode = strtoupper(trim($rule->category));
-            if (! isset($matrix[$group][$subjectCode])) {
+            if (! isset($matrix[$group])) {
                 continue;
             }
 
-            $matrix[$group][$subjectCode] = (float) $rule->points_correct;
+            $matrix[$group][$rule->category] = (float) $rule->points_correct;
         }
 
         return $matrix;
@@ -307,17 +268,15 @@ class ScoringService
     /**
      * @param  array<string, array<string, float>>|null  $rulesMatrix
      */
-    public function getPointsForCorrect(Exam $exam, string $subject, string $group, ?array $rulesMatrix = null): float
+    public function getPointsForCorrect(Exam $exam, string $subject, string $group, ?array $rulesMatrix = null, ?int $questionNumber = null): float
     {
         $groupKey = $this->normalizeGroup($group);
-        $subjectCode = $this->getSubjectCode($subject);
-        $category = $this->getSubjectCategory($subject);
+        $category = $questionNumber
+            ? $this->getCategoryForQuestion($groupKey, $questionNumber, $subject)
+            : $this->getSubjectCategory($subject);
         $rulesMatrix ??= $this->getScoringRulesMatrix($exam);
 
-        return $rulesMatrix[$groupKey][$subjectCode]
-            ?? self::SUBJECT_WEIGHT_CONFIG[$groupKey][$subjectCode]
-            ?? self::WEIGHT_CONFIG[$groupKey][$category]
-            ?? 20.0000;
+        return $rulesMatrix[$groupKey][$category] ?? self::WEIGHT_CONFIG[$groupKey][$category] ?? 20.0000;
     }
 
     /**
@@ -392,8 +351,8 @@ class ScoringService
         $rulesMatrix = $this->getScoringRulesMatrix($exam);
         $total = 0.0;
 
-        foreach ($answerKeys as $key) {
-            $total += $this->getPointsForCorrect($exam, $key->subject ?? 'General', $groupCode, $rulesMatrix);
+        foreach ($answerKeys as $questionNumber => $key) {
+            $total += $this->getPointsForCorrect($exam, $key->subject ?? 'General', $groupCode, $rulesMatrix, (int) $questionNumber);
         }
 
         return round($total, 4);
@@ -437,8 +396,9 @@ class ScoringService
             $subject = $keyObj ? ($keyObj->subject ?? 'General') : 'General';
             $correctKey = $keyObj ? strtoupper(trim($keyObj->correct_key)) : '';
             $isAnnulled = $keyObj ? $keyObj->is_annulled : false;
+            $scoreCategory = $this->getCategoryForQuestion($groupCode, $i, $subject);
 
-            $ptsCorrect = $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix);
+            $ptsCorrect = $this->getPointsForCorrect($exam, $subject, $groupCode, $rulesMatrix, $i);
 
             $status = 'blank';
             $questionScore = 0.0;
@@ -467,6 +427,7 @@ class ScoringService
             $scoresDetail[$i] = [
                 'question_number' => $i,
                 'subject' => $subject,
+                'score_category' => $scoreCategory,
                 'given_answer' => $givenAnswer,
                 'correct_key' => $correctKey,
                 'status' => $status,

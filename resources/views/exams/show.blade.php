@@ -487,8 +487,8 @@
                     <i class="fa-solid fa-calculator"></i>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-white">Puntaje por Pregunta Correcta</h3>
-                    <p class="text-xs text-slate-400">Cada correcta suma el valor configurado por asignatura. Penalidad por mala: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
+                    <h3 class="text-base font-bold text-white">Pesos por Pregunta Correcta</h3>
+                    <p class="text-xs text-slate-400">Cada correcta suma el valor configurado por bloque. Penalidad por mala: {{ number_format($exam->incorrect_penalty, 4) }} | Blanco: {{ number_format($exam->blank_score, 4) }}</p>
                 </div>
             </div>
             <button type="button" onclick="document.getElementById('modal-scoring-rules').classList.add('hidden')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
@@ -502,7 +502,7 @@
                 <table class="w-full text-xs text-left">
                     <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
                         <tr>
-                            <th class="py-3 px-3 min-w-52">Asignatura</th>
+                            <th class="py-3 px-3 min-w-52">Bloque</th>
                             @foreach($scoringGroups as $groupCode => $groupLabel)
                                 @php
                                     $groupMaxScore = $scoringMaxScores[$groupCode] ?? 0;
@@ -526,6 +526,9 @@
                                 </td>
                                 @foreach($scoringGroups as $groupCode => $groupLabel)
                                     <td class="py-3 px-3">
+                                        <div class="mb-1 text-[10px] text-slate-500 text-right">
+                                            {{ $scoringDistributions[$groupCode][$categoryCode] ?? 0 }} preg.
+                                        </div>
                                         <input type="number" step="0.0001" min="0" max="1000" name="rules[{{ $groupCode }}][{{ $categoryCode }}]" value="{{ number_format($scoringRules[$groupCode][$categoryCode] ?? 0, 4, '.', '') }}" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white text-right font-mono focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
                                     </td>
                                 @endforeach

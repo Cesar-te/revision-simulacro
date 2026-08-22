@@ -207,10 +207,9 @@ class ExamController extends Controller
         ];
         $subjectColumns = ScoringService::SUBJECT_COLUMNS;
         $scoringRules = $this->scoringService->getScoringRulesMatrix($exam);
-        $scoringCategories = collect(ScoringService::SUBJECT_COLUMNS)
-            ->mapWithKeys(fn (array $subject, string $code): array => [$code => $subject['name']])
-            ->all();
+        $scoringCategories = ScoringService::CATEGORY_LABELS;
         $scoringGroups = ScoringService::GROUP_LABELS;
+        $scoringDistributions = ScoringService::CATEGORY_QUESTION_DISTRIBUTIONS;
         $scoringMaxScores = [];
         foreach (array_keys($scoringGroups) as $groupCode) {
             $scoringMaxScores[$groupCode] = $this->scoringService->getMaximumCorrectScoreForGroup($exam, $groupCode);
@@ -231,6 +230,7 @@ class ExamController extends Controller
             'scoringRules',
             'scoringCategories',
             'scoringGroups',
+            'scoringDistributions',
             'scoringMaxScores'
         ));
     }
@@ -351,15 +351,15 @@ class ExamController extends Controller
 
         $this->scoringService->ensureScoringRules($exam);
 
-        foreach (ScoringService::SUBJECT_WEIGHT_CONFIG as $group => $subjects) {
-            foreach (array_keys($subjects) as $subjectCode) {
-                $points = (float) data_get($request->input('rules'), "{$group}.{$subjectCode}", $subjects[$subjectCode]);
+        foreach (ScoringService::WEIGHT_CONFIG as $group => $categories) {
+            foreach (array_keys($categories) as $category) {
+                $points = (float) data_get($request->input('rules'), "{$group}.{$category}", $categories[$category]);
 
                 ExamScoringRule::updateOrCreate(
                     [
                         'exam_id' => $exam->id,
                         'academic_group' => $group,
-                        'category' => $subjectCode,
+                        'category' => $category,
                     ],
                     [
                         'points_correct' => round($points, 4),

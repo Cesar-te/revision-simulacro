@@ -72,6 +72,7 @@
                 <div class="flex justify-between"><span class="text-slate-400">Ciencias Básicas (24 preg):</span> <span class="font-semibold text-cyan-300">22.2220 pts c/u</span></div>
                 <div class="flex justify-between"><span class="text-slate-400">Física y Química (12 preg):</span> <span class="font-semibold text-cyan-300">22.2220 pts c/u</span></div>
                 <div class="flex justify-between"><span class="text-slate-400">Humanidades (19 preg):</span> <span class="font-semibold text-white">17.6310 pts</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Biología (5 preg):</span> <span class="font-semibold text-white">13.0038 pts</span></div>
             </div>
         </div>
     </div>

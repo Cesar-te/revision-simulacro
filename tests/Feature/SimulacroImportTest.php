@@ -105,13 +105,13 @@ class SimulacroImportTest extends TestCase
             'title' => 'SIMULACRO MULTI-GRUPO UNPRG',
             'incorrect_penalty' => -1.1250,
             'blank_score' => 0.0,
-            'total_questions' => 20,
+            'total_questions' => 100,
         ]);
 
         ExamAnswerKey::create([
             'exam_id' => $exam->id,
             'academic_group' => 'A',
-            'question_number' => 1,
+            'question_number' => 83,
             'subject' => 'Biologia',
             'correct_key' => 'A',
         ]);
@@ -119,17 +119,17 @@ class SimulacroImportTest extends TestCase
         ExamAnswerKey::create([
             'exam_id' => $exam->id,
             'academic_group' => 'EF',
-            'question_number' => 1,
+            'question_number' => 41,
             'subject' => 'Fisica',
             'correct_key' => 'B',
         ]);
 
-        $scoreA = $scoring->scoreStudent($exam, [1 => 'A'], 'MEDICINA HUMANA', 'A');
+        $scoreA = $scoring->scoreStudent($exam, [83 => 'A'], 'MEDICINA HUMANA', 'A');
         $this->assertEquals(1, $scoreA['correct_count']);
         $this->assertEquals(25.0, $scoreA['total_score']);
         $this->assertEquals('A', $scoreA['academic_group']);
 
-        $scoreEF = $scoring->scoreStudent($exam, [1 => 'B'], 'DERECHO', 'EF');
+        $scoreEF = $scoring->scoreStudent($exam, [41 => 'B'], 'DERECHO', 'EF');
         $this->assertEquals(1, $scoreEF['correct_count']);
         $this->assertEquals(22.222, $scoreEF['total_score']);
         $this->assertEquals('EF', $scoreEF['academic_group']);
@@ -160,14 +160,14 @@ class SimulacroImportTest extends TestCase
         $this->assertEquals(1, $stEF->fresh()->group_rank);
     }
 
-    public function test_correct_answers_use_configured_question_values_without_hidden_scaling(): void
+    public function test_engineering_uses_group_distribution_instead_of_key_area_labels(): void
     {
         $scoring = new ScoringService;
         $exam = Exam::create([
-            'title' => 'SIMULACRO CALCULO LITERAL',
+            'title' => 'SIMULACRO DISTRIBUCION EF',
             'incorrect_penalty' => -1.1250,
             'blank_score' => 0.0,
-            'total_questions' => 2,
+            'total_questions' => 41,
         ]);
 
         ExamAnswerKey::create([
@@ -181,39 +181,45 @@ class SimulacroImportTest extends TestCase
         ExamAnswerKey::create([
             'exam_id' => $exam->id,
             'academic_group' => 'EF',
-            'question_number' => 2,
+            'question_number' => 41,
             'subject' => 'Biologia',
             'correct_key' => 'A',
         ]);
 
-        $score = $scoring->scoreStudent($exam, [1 => 'A', 2 => 'A'], 'Ingenieria Civil', 'EF');
+        $score = $scoring->scoreStudent($exam, [1 => 'A', 41 => 'A'], 'Ingenieria Civil', 'EF');
 
         $this->assertEquals(2, $score['correct_count']);
-        $this->assertEquals(33.0038, $score['total_score']);
+        $this->assertEquals(42.222, $score['total_score']);
+        $this->assertEquals('MATE_BASIC', $score['scores_detail_json'][41]['score_category']);
     }
 
-    public function test_short_subject_codes_use_their_subject_points(): void
+    public function test_all_correct_scores_reach_2000_with_group_distributions(): void
     {
         $scoring = new ScoringService;
-        $exam = Exam::create([
-            'title' => 'SIMULACRO CODIGOS CORTOS',
-            'incorrect_penalty' => -1.1250,
-            'blank_score' => 0.0,
-            'total_questions' => 1,
-        ]);
 
-        ExamAnswerKey::create([
-            'exam_id' => $exam->id,
-            'academic_group' => 'EF',
-            'question_number' => 1,
-            'subject' => 'ARIT',
-            'correct_key' => 'A',
-        ]);
+        foreach (['A', 'BCD', 'EF'] as $group) {
+            $exam = Exam::create([
+                'title' => "SIMULACRO MAXIMO {$group}",
+                'incorrect_penalty' => -1.1250,
+                'blank_score' => 0.0,
+                'total_questions' => 100,
+            ]);
 
-        $score = $scoring->scoreStudent($exam, [1 => 'A'], 'Ingenieria Civil', 'EF');
+            for ($question = 1; $question <= 100; $question++) {
+                ExamAnswerKey::create([
+                    'exam_id' => $exam->id,
+                    'academic_group' => $group,
+                    'question_number' => $question,
+                    'subject' => 'Biologia',
+                    'correct_key' => 'A',
+                ]);
+            }
 
-        $this->assertEquals(22.222, $score['total_score']);
-        $this->assertEquals(22.222, $score['scores_detail_json'][1]['points']);
+            $score = $scoring->scoreStudent($exam, array_fill(1, 100, 'A'), 'Ingenieria Civil', $group);
+
+            $this->assertEquals(100, $score['correct_count']);
+            $this->assertEqualsWithDelta(2000.0, $score['total_score'], 0.001);
+        }
     }
 
     public function test_any_wrong_answer_uses_flat_penalty(): void
@@ -365,8 +371,8 @@ class SimulacroImportTest extends TestCase
             'answers_json' => [1 => 'A'],
         ]);
 
-        $rules = ScoringService::SUBJECT_WEIGHT_CONFIG;
-        $rules['A']['HV'] = 30.5;
+        $rules = ScoringService::WEIGHT_CONFIG;
+        $rules['A']['VERBAL_MATE'] = 30.5;
 
         $this->post(route('exams.scoring-rules.update', $exam), ['rules' => $rules])
             ->assertRedirect(route('exams.show', $exam));
@@ -374,7 +380,7 @@ class SimulacroImportTest extends TestCase
         $this->assertDatabaseHas('exam_scoring_rules', [
             'exam_id' => $exam->id,
             'academic_group' => 'A',
-            'category' => 'HV',
+            'category' => 'VERBAL_MATE',
             'points_correct' => 30.5,
         ]);
 
